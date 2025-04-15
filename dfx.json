@@ -1,0 +1,27 @@
+{
+  "canisters": {
+    "bot": {
+      "candid": "src/bot.did",
+      "package": "bot",
+      "build": "./scripts/build-bot.sh",
+      "wasm": "target/wasm32-wasip1/release/bot.gz",
+      "type": "custom"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8080",
+      "type": "ephemeral",
+      "replica": {
+        "subnet_type": "system"
+      }
+    }
+  },
+  "version": 1
+}
