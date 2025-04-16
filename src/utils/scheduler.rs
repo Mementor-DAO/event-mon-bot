@@ -1,8 +1,8 @@
 use std::{cell::Cell, collections::{BTreeMap, BTreeSet, HashMap}, future::Future, time::Duration};
 use oc_bots_sdk_canister::env;
-use oc_bots_sdk::types::{ActionScope, BotApiKeyContext, BotPermissions, Chat, TimestampMillis};
+use oc_bots_sdk::{types::{ActionScope, BotApiKeyContext, BotPermissions, Chat, TimestampMillis}, ApiKeyRegistry};
 use ic_cdk_timers::TimerId;
-use crate::{state, types::scheduler::{JobId, JobType, Schedulable, Scheduler}};
+use crate::types::scheduler::{JobId, JobType, Schedulable, Scheduler};
 
 // code adapted from https://github.com/open-chat-labs/open-chat-bots/blob/main/rs/canister/examples/reminder/src/model/reminders.rs
 
@@ -89,6 +89,7 @@ impl<T> Scheduler<T>
 
     pub fn process<TF, JF, R>(
         &mut self,
+        api_key_registry: &ApiKeyRegistry,
         timer_cb: TF,
         job_cb: JF
     ) where 
@@ -98,11 +99,10 @@ impl<T> Scheduler<T>
         TIMER_ID.set(None);
 
         while let Some(job) = self.pop_next_due_job(env::now()) {
-            if let Some(api_key) = state::read(|s| s.api_key_registry()
-                .get_key_with_required_permissions(
+            if let Some(api_key) = api_key_registry.get_key_with_required_permissions(
                     &ActionScope::Chat(job.chat()),
                     &BotPermissions::text_only(),
-                ).cloned()) {
+                ).cloned() {
                 let job = job.clone();
                 ic_cdk::spawn(job_cb(
                     api_key.to_context(),
@@ -117,7 +117,7 @@ impl<T> Scheduler<T>
     }
 
     pub fn start_if_required<F>(
-        &mut self,
+        &self,
         timer_cb: F
     ) -> bool 
         where F: 'static + FnOnce() -> () {
@@ -137,7 +137,7 @@ impl<T> Scheduler<T>
     }
     
     pub fn restart<F>(
-        &mut self,
+        &self,
         timer_cb: F
     ) where F: 'static + FnOnce() -> () {
         if let Some(timer_id) = TIMER_ID.get() {

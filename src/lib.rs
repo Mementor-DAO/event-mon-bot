@@ -1,6 +1,6 @@
 mod types;
 mod services;
-mod state;
+mod states;
 mod memory;
 mod router;
 mod lifecycle;

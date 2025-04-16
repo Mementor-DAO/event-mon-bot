@@ -2,26 +2,21 @@ use std::cell::RefCell;
 use candid::Principal;
 use oc_bots_sdk::ApiKeyRegistry;
 use serde::{Deserialize, Serialize};
-
-use crate::types::{job::Job, scheduler::Scheduler};
-
-thread_local! {
-    static STATE: RefCell<Option<State>> = RefCell::default();
-}
+use super::{STATE_NOT_INITIALIZED, STATE_ALREADY_INITIALIZED};
 
 #[derive(Serialize, Deserialize)]
-pub struct State {
+pub struct MainState {
     oc_public_key: String,
     administrator: Principal,
     api_key_registry: ApiKeyRegistry,
-    scheduler: Scheduler<Job>
 }
 
-const STATE_ALREADY_INITIALIZED: &str = "State has already been initialized";
-const STATE_NOT_INITIALIZED: &str = "State has not been initialized";
+thread_local! {
+    static STATE: RefCell<Option<MainState>> = RefCell::default();
+}
 
 pub fn init(
-    state: State
+    state: MainState
 ) {
     STATE.with_borrow_mut(|s| {
         if s.is_some() {
@@ -29,14 +24,14 @@ pub fn init(
         } else {
             *s = Some(state);
         }
-    })
+    });
 }
 
 pub fn read<F, R>(
     f: F
 ) -> R 
     where 
-        F: FnOnce(&State) -> R {
+        F: FnOnce(&MainState) -> R {
     STATE.with_borrow(|s| 
         f(s.as_ref().expect(STATE_NOT_INITIALIZED))
     )
@@ -47,18 +42,18 @@ pub fn mutate<F, R>(
     f: F
 ) -> R 
     where 
-        F: FnOnce(&mut State) -> R {
+        F: FnOnce(&mut MainState) -> R {
     STATE.with_borrow_mut(|s| 
         f(s.as_mut().expect(STATE_NOT_INITIALIZED))
     )
 }
 
 pub fn take(
-) -> State {
+) -> MainState {
     STATE.take().expect(STATE_NOT_INITIALIZED)
 }
 
-impl State {
+impl MainState {
     pub fn new(
         oc_public_key: String,
         administrator: Principal,
@@ -67,7 +62,6 @@ impl State {
             oc_public_key,
             administrator,
             api_key_registry: ApiKeyRegistry::default(),
-            scheduler: Scheduler::new()
         }
     }
 
@@ -101,11 +95,5 @@ impl State {
         &mut self
     ) -> &mut ApiKeyRegistry {
         &mut self.api_key_registry
-    }
-    
-    pub fn scheduler_mut(
-        &mut self
-    ) -> &mut Scheduler<Job> {
-        &mut self.scheduler
     }
 }

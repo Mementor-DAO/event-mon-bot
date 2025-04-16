@@ -4,7 +4,7 @@ use serde::Deserialize;
 use crate::{
     lifecycle::READER_WRITER_BUFFER_SIZE, 
     memory::get_upgrades_memory, 
-    state::State, 
+    states::{main::MainState, mon::MonState}, 
     types::init::InitOrUpgradeArgs
 };
 use super::setup;
@@ -17,8 +17,14 @@ fn post_upgrade(
     let reader = BufferedReader::new(READER_WRITER_BUFFER_SIZE, Reader::new(&memory, 0));
     let mut deserializer = rmp_serde::Deserializer::new(reader);
 
-    let mut state = State::deserialize(&mut deserializer).unwrap();
-    state.set_administrator(args.administrator.clone());
-    state.set_oc_public_key(args.oc_public_key.clone());
-    setup(state).unwrap();
+    let mut main_state = MainState::deserialize(&mut deserializer).unwrap();
+    main_state.set_administrator(args.administrator.clone());
+    main_state.set_oc_public_key(args.oc_public_key.clone());
+
+    let mon_state = MonState::deserialize(&mut deserializer).unwrap();
+    
+    setup(
+        main_state, 
+        mon_state
+    ).unwrap();
 }

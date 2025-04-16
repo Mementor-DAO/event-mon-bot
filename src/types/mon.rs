@@ -4,33 +4,33 @@ use serde::{Deserialize, Serialize};
 use super::scheduler::{JobType, Schedulable};
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub struct JobCanister {
+pub struct MonCanister {
     pub canister_id: Principal,
     pub method_name: String,
     pub output_template: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub enum JobKind {
-    Canister(JobCanister)
+pub enum MonType {
+    Canister(MonCanister)
 }
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub enum JobState {
+pub enum MonState {
     Idle,
     Running,
 }
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub struct Job {
-    pub kind: JobKind,
+pub struct Mon {
+    pub ty: MonType,
     pub interval: u32,
     pub chat: Chat,
     pub chat_job_id: u8,
-    pub state: JobState,
+    pub state: MonState,
 }
 
-impl Job {
+impl Mon {
     pub fn new_canister(
         canister_id: Principal, 
         method_name: String, 
@@ -39,7 +39,7 @@ impl Job {
         chat: Chat
     ) -> Self {
         Self {
-            kind: JobKind::Canister(JobCanister{
+            ty: MonType::Canister(MonCanister{
                 canister_id,
                 method_name,
                 output_template,
@@ -47,12 +47,12 @@ impl Job {
             interval,
             chat,
             chat_job_id: 0,
-            state: JobState::Running,
+            state: MonState::Running,
         }
     }
 }
 
-impl Schedulable<Job> for Job {
+impl Schedulable<Mon> for Mon {
     fn ty(
         &self
     ) -> JobType {
@@ -62,7 +62,7 @@ impl Schedulable<Job> for Job {
     fn interval(
         &self
     ) -> u64 {
-        self.interval as _
+        (self.interval as u64) * 1_000
     }
 
     fn chat(

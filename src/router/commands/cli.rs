@@ -25,10 +25,10 @@ use oc_bots_sdk_canister::{
     env, CanisterRuntime, OPENCHAT_CLIENT_FACTORY
 };
 use crate::{
-    state, 
+    states, 
     types::{
         cli::{Cli, Commands, CreateSubcommand}, 
-        job::Job
+        mon::Mon
     }
 };
 
@@ -60,7 +60,7 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
 
         let chat = chat_scope.chat;
 
-        state::read(|s| {
+        states::main::read(|s| {
             if s.api_key_registry()
                 .get_key_with_required_permissions(
                     &ctx.scope.clone().into(),
@@ -137,9 +137,9 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
 impl EventsMonCli {
     pub fn setup(
     ) {
-        state::mutate(|s| 
-            s.scheduler_mut().start_if_required(EventsMonCli::timer_cb)
-        );
+        states::mon::read(|s| {
+            s.scheduler().start_if_required(EventsMonCli::timer_cb);
+        });
     }
     
     fn create_canister_job(
@@ -153,8 +153,8 @@ impl EventsMonCli {
 
         let canister_id = Principal::from_text(canister_id).unwrap();
 
-        let job_id = state::mutate(|s| {
-            let job = Job::new_canister(
+        let job_id = states::mon::mutate(|s| {
+            let job = Mon::new_canister(
                 canister_id, 
                 method_name, 
                 output_template, 
@@ -191,37 +191,37 @@ impl EventsMonCli {
         )
     }
 
-    async fn job_cb(
+    async fn mon_cb(
         ctx: BotApiKeyContext,
-        job: Job
+        mon: Mon
     ) {
         match OPENCHAT_CLIENT_FACTORY
             .build(ctx)
             .send_message(MessageContentInitial::Text(TextContent { text: "hey!".to_string() }))
-            .with_channel_id(job.chat.channel_id())
+            .with_channel_id(mon.chat.channel_id())
             .with_block_level_markdown(true)
             .execute_async()
             .await
         {
             Ok(send_message::Response::Success(_)) => (),
             Err((code, message)) => {
-                ic_cdk::println!("error: Failed to send event: {}: {}", code, message);
+                ic_cdk::println!("error: Failed to send event: code({}): message({})", code, message);
             }
             other => {
-                state::mutate(|s| {
-                    let _ = s.scheduler_mut().delete(&job.chat, job.chat_job_id);
-                });
-                ic_cdk::println!("error: Failed to send event - DELETING: {:?}", other);
+                ic_cdk::println!("error: Failed to send event {:?}", other);
             }
         }
     }
 
     fn timer_cb() {
-        state::mutate(|s| {
-            s.scheduler_mut().process(
-                Self::timer_cb,
-                Self::job_cb
-            );
+        states::mon::mutate(|mon_state| {
+            states::main::read(|main_state| {
+                mon_state.scheduler_mut().process(
+                    main_state.api_key_registry(),
+                    Self::timer_cb,
+                    Self::mon_cb
+                );
+            })
         })
     }
 

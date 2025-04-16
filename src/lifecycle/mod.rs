@@ -1,6 +1,6 @@
 use crate::{
     router::commands::cli::EventsMonCli, 
-    state::{self, State}
+    states::{self, main::MainState, mon::MonState}
 };
 
 pub mod init;
@@ -10,11 +10,13 @@ pub mod pre_upgrade;
 const READER_WRITER_BUFFER_SIZE: usize = 10 * 1024 * 1024; // 10MB
 
 pub(crate) fn setup(
-    s: State
+    main_state: MainState,
+    mon_state: MonState
 ) -> Result<(), String> {
     ic_wasi_polyfill::init(&[0u8; 32], &[]);
 
-    state::init(s);
+    states::main::init(main_state);
+    states::mon::init(mon_state);
 
     EventsMonCli::setup();
 

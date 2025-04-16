@@ -1,6 +1,6 @@
 use ic_cdk::init;
 use crate::{
-    state::State,
+    states::{main::MainState, mon::MonState},
     types::init::InitOrUpgradeArgs
 };
 use super::setup;
@@ -10,10 +10,15 @@ fn init(
     args: InitOrUpgradeArgs
 ) {
     ic_cdk::setup();
-    let state = State::new(
+    let main_state = MainState::new(
         args.oc_public_key.clone(), 
         args.administrator.clone()
     );
-    setup(state).unwrap();
+    let mon_state = MonState::new(
+    );
+    setup(
+        main_state,
+        mon_state
+    ).unwrap();
 }
 
