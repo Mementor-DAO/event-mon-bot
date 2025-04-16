@@ -51,7 +51,7 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
         let ctx = client.context();
 
         let args = shell_words::split(
-            &format!("/events_mon {}", client.context().command.arg::<String>("args"))
+            &format!("/eventmon {}", client.context().command.arg::<String>("args"))
         ).unwrap();
 
         let BotCommandScope::Chat(chat_scope) = &ctx.scope else {
@@ -228,7 +228,7 @@ impl EventsMonCli {
     fn definition(
     ) -> BotCommandDefinition {
         BotCommandDefinition {
-            name: "events_mon".to_string(),
+            name: "eventmon".to_string(),
             description: Some("Events Monitor Bot's command interface. Type -h for help".to_string()),
             placeholder: Some("Please wait...".to_string()),
             params: vec![

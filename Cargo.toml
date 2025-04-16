@@ -1,12 +1,11 @@
-[package]
-name = "bot"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "packages/bot",
+    "packages/monitor",
+]
+resolver = "2"
 
-[lib]
-crate-type = ["cdylib"]
-
-[dependencies]
+[workspace.dependencies]
 candid = "0.10.10"
 ic-cdk = "0.17.0"
 ic-cdk-timers = "0.11.0"
@@ -23,6 +22,7 @@ ansi-to-html = {version = "0.2.2", default-features = false}
 shell-words = "1.1.0"
 oc_bots_sdk = {git = "https://github.com/open-chat-labs/open-chat-bots.git"}
 oc_bots_sdk_canister = {git = "https://github.com/open-chat-labs/open-chat-bots.git"}
+
 
 [profile.release]
 lto = true

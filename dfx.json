@@ -1,10 +1,17 @@
 {
   "canisters": {
     "bot": {
-      "candid": "src/bot.did",
+      "candid": "packages/bot/bot.did",
       "package": "bot",
       "build": "./scripts/build-bot.sh",
       "wasm": "target/wasm32-wasip1/release/bot.gz",
+      "type": "custom"
+    },
+    "monitor": {
+      "candid": "packages/monitor/monitor.did",
+      "package": "monitor",
+      "build": "./scripts/build-monitor.sh",
+      "wasm": "target/wasm32-unknown-unknown/release/monitor.gz",
       "type": "custom"
     }
   },
