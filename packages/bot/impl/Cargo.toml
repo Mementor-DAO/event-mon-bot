@@ -1,0 +1,30 @@
+[package]
+name = "bot"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid = {workspace = true}
+ic-cdk = {workspace = true}
+ic-cdk-timers = {workspace = true}
+ic-http-certification = {workspace = true}
+icrc-ledger-types = {workspace = true}
+ic-stable-structures = {workspace = true}
+ic-wasi-polyfill = {workspace = true}
+async-trait = {workspace = true}
+serde = {workspace = true}
+serde_json = {workspace = true}
+rmp-serde = {workspace = true}
+sha2 = {workspace = true}
+hex = {workspace = true}
+futures = {workspace = true}
+clap = {workspace = true}
+ansi-to-html = {workspace = true}
+shell-words = {workspace = true}
+oc_bots_sdk = {workspace = true}
+oc_bots_sdk_canister = {workspace = true}
+bot_api = {path = "../api"}
+monitor_api = {path = "../../monitor/api"}

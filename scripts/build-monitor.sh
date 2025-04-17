@@ -17,6 +17,6 @@ candid-extractor $RELEASE_DIR/$NAME.wasm >./packages/$NAME/$NAME.did
 #ic-wasm $RELEASE_DIR/$NAME.wasm -o $RELEASE_DIR/$NAME.wasm shrink
 #ic-wasm $RELEASE_DIR/$NAME.wasm -o $RELEASE_DIR/$NAME.wasm optimize Oz
 ic-wasm $RELEASE_DIR/$NAME.wasm -o $RELEASE_DIR/$NAME.wasm metadata candid:service -f ./packages/$NAME/$NAME.did -v public
-gzip --best -c $RELEASE_DIR/$NAME.wasm >$RELEASE_DIR/$NAME.gz
+gzip -fckn9 $RELEASE_DIR/$NAME.wasm >$RELEASE_DIR/$NAME.gz
 
 popd

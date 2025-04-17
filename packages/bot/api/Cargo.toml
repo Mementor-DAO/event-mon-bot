@@ -1,0 +1,11 @@
+[package]
+name = "bot_api"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+candid = {workspace = true}
+ic-cdk = {workspace = true}
+serde = {workspace = true}
+oc_bots_sdk = {workspace = true}
+oc_bots_sdk_canister = {workspace = true}
