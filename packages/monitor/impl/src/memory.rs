@@ -4,6 +4,7 @@ use ic_stable_structures::{
 };
 
 const UPGRADES: MemoryId            = MemoryId::new(0);
+const JOBS: MemoryId                = MemoryId::new(1);
 
 pub type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -18,4 +19,8 @@ fn get_memory(id: MemoryId) -> Memory {
 
 pub fn get_upgrades_memory() -> Memory {
     get_memory(UPGRADES)
+}
+
+pub fn get_jobs_memory() -> Memory {
+    get_memory(JOBS)
 }

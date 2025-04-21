@@ -1,4 +1,6 @@
-use crate::state::{self, State};
+use crate::
+    state::{self, State}
+;
 
 pub mod init;
 pub mod post_upgrade;

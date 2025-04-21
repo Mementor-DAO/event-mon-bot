@@ -1,0 +1,32 @@
+type Chat = variant {
+  Group : principal;
+  Channel : record { principal; nat32 };
+  Direct : principal;
+};
+type HttpRequest = record {
+  url : text;
+  method : text;
+  body : blob;
+  headers : vec record { text; text };
+};
+type HttpResponse = record {
+  body : blob;
+  headers : vec record { text; text };
+  upgrade : opt bool;
+  status_code : nat16;
+};
+type InitOrUpgradeArgs = record {
+  monitor_wasm : blob;
+  oc_public_key : text;
+  administrator : principal;
+};
+type NotifiyEventsArgs = record { chat : Chat };
+type Result = variant { Ok; Err : text };
+type Result_1 = variant { Ok : record {}; Err : text };
+type UpdateMonitorArgs = record { wasm : blob };
+service : (InitOrUpgradeArgs) -> {
+  http_request : (HttpRequest) -> (HttpResponse) query;
+  http_request_update : (HttpRequest) -> (HttpResponse);
+  notify_events : (NotifiyEventsArgs) -> (Result);
+  update_monitor : (UpdateMonitorArgs) -> (Result_1);
+}

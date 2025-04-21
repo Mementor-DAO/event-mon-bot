@@ -1,10 +1,12 @@
 use std::{cell::Cell, collections::{BTreeSet, HashMap}, future::Future, time::Duration};
 use ic_cdk_timers::TimerId;
-use crate::types::scheduler::{JobId, JobType, Schedulable, Scheduler};
+use crate::
+    types::scheduler::{JobId, Schedulable, Scheduler}
+;
 
 // code adapted from https://github.com/open-chat-labs/open-chat-bots/blob/main/rs/canister/examples/reminder/src/model/reminders.rs
 
-const MAX_JOBS: usize = 10;
+const MAX_JOBS: usize = 100;
 
 thread_local! {
     static TIMER_ID: Cell<Option<TimerId>> = Cell::default();
@@ -26,48 +28,46 @@ impl<T> Scheduler<T>
         &mut self,
         job: T,
         utc_now: u64,
-    ) -> Result<bool, String> {
+    ) -> Result<(JobId, bool), String> {
         if self.jobs.len() >= MAX_JOBS {
             return Err("Too many jobs".to_string());
         }
 
-        let timestamp = match &job.ty() {
-            JobType::Recurring => {
-                Self::next_job_time(&job, utc_now).unwrap()
-            }
-            JobType::Once => {
-                utc_now + job.interval()
-            },
+        let timestamp = if job.repeat() {
+            Self::next_job_time(&job, utc_now).unwrap()
+        }
+        else {
+            utc_now + job.interval()
         };
 
-        let global_id = self.next_id;
+        let job_id = self.next_id;
         self.next_id += 1;
 
         self.jobs.insert(
-            global_id,
+            job_id,
             job,
         );
 
-        self.ordered.insert((timestamp, global_id));
+        self.ordered.insert((timestamp, job_id));
 
-        let next_due = self.peek().map(|(_, id)| id == global_id).unwrap();
+        let next_due = self.peek().map(|(_, id)| id == job_id).unwrap();
 
-        Ok(next_due)
+        Ok((job_id, next_due))
     }
 
-    pub fn process<TF, JF, R>(
+    pub fn process<TF, JF, JR>(
         &mut self,
         timer_cb: TF,
         job_cb: JF
     ) where 
-        TF: 'static + FnOnce() -> (),
-        JF: FnOnce(T) -> R + Copy,
-        R: 'static + Future<Output = ()> {
+        TF: FnOnce() -> () + 'static,
+        JF: FnOnce(JobId) -> JR + Copy + 'static,
+        JR: Future<Output = ()> + 'static {
+            
         TIMER_ID.set(None);
 
-        while let Some(job) = self.pop_next_due_job(ic_cdk::api::time()) {
-            let job = job.clone();
-            ic_cdk::futures::spawn(job_cb(job));
+        while let Some((_job, job_id)) = self.pop_next_due_job(ic_cdk::api::time()) {
+            ic_cdk::spawn(job_cb(job_id));
         }
 
         self.start_if_required(timer_cb);
@@ -105,17 +105,17 @@ impl<T> Scheduler<T>
         self.start_if_required(timer_cb);
     }
 
-    pub fn peek(
+    fn peek(
         &self
     ) -> Option<(u64, JobId)> {
         self.ordered.iter().next().copied()
     }
 
-    pub fn pop_next_due_job(
+    fn pop_next_due_job(
         &mut self, 
         utc_now: u64
-    ) -> Option<T> {
-        let (timestamp, global_id) = self.peek()?;
+    ) -> Option<(T, JobId)> {
+        let (timestamp, job_id) = self.peek()?;
 
         if timestamp > utc_now {
             return None;
@@ -123,31 +123,31 @@ impl<T> Scheduler<T>
 
         self.ordered.pop_first();
 
-        let job = self.jobs.get_mut(&global_id)?;
+        let job = self.jobs.get_mut(&job_id)?;
 
         let job = if let Some(next) =
             Self::next_job_time(&job, utc_now) {
-            self.ordered.insert((next, global_id));
+            self.ordered.insert((next, job_id));
 
             job.clone()
         } 
         else {
-            self.jobs.remove(&global_id).unwrap()
+            self.jobs.remove(&job_id).unwrap()
         };
 
-        Some(job)
+        Some((job, job_id))
     }
 
     pub fn delete(
         &mut self,
-        global_id: u64
+        job_id: u64
     ) -> Result<T, String> {
         self.jobs
-            .remove(&global_id)
+            .remove(&job_id)
             .ok_or("Job not found".to_string())
     }
 
-    pub fn count(
+    fn count(
         &self
     ) -> usize {
         self.jobs.len()
@@ -157,13 +157,11 @@ impl<T> Scheduler<T>
         job: &T,
         utc_now: u64,
     ) -> Option<u64> {
-        match job.ty() {
-            JobType::Recurring => {
-                Some(utc_now + job.interval())
-            },
-            JobType::Once => {
-                None
-            },
+        if job.repeat() {
+            Some(utc_now + job.interval())
+        }
+        else {
+            None
         }
     }
 }

@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use candid::Principal;
-use oc_bots_sdk::types::Chat;
 use serde::{Deserialize, Serialize};
+use crate::types::{job::Job, scheduler::Scheduler};
 
 const STATE_ALREADY_INITIALIZED: &str = "State has already been initialized";
 const STATE_NOT_INITIALIZED: &str = "State has not been initialized";
@@ -10,7 +10,7 @@ const STATE_NOT_INITIALIZED: &str = "State has not been initialized";
 pub struct State {
     administrator: Principal,
     bot_canister_id: Principal,
-    chat: Chat,
+    scheduler: Scheduler<Job>
 }
 
 thread_local! {
@@ -59,12 +59,11 @@ impl State {
     pub fn new(
         administrator: Principal,
         bot_canister_id: Principal,
-        chat: Chat
     ) -> Self {
         Self {
             administrator,
             bot_canister_id,
-            chat,
+            scheduler: Scheduler::new()
         }
     }
 
@@ -93,10 +92,10 @@ impl State {
     ) {
         self.bot_canister_id = bot_canister_id;
     }
-    
-    pub fn chat(
-        &self
-    ) -> Chat {
-        self.chat
+
+    pub fn scheduler_mut(
+        &mut self
+    ) -> &mut Scheduler<Job> {
+        &mut self.scheduler
     }
 }

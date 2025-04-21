@@ -1,24 +1,31 @@
 use bot_api::updates::notify_events::NotifiyEventsArgs;
 use oc_bots_sdk::{
     oc_api::actions::{send_message, ActionArgsBuilder}, 
-    types::{ActionScope, BotApiKeyContext, BotPermissions, Chat, MessageContentInitial, TextContent}
+    types::{
+        ActionScope, BotApiKeyContext, BotPermissions, 
+        Chat, MessageContentInitial, TextContent
+    }
 };
 use oc_bots_sdk_canister::OPENCHAT_CLIENT_FACTORY;
-use crate::{guards::*, state};
+use crate::{guards::*, state, storage::monitor::MonitorStorage};
 
-#[ic_cdk::update]
+#[ic_cdk::update(guard = "monitor_canister_only")]
 pub async fn notify_events(
     args: NotifiyEventsArgs
 ) -> Result<(), String> {
-    monitor_canister_only().await?;
+    let mon = MonitorStorage::load_by_canister_id(&ic_cdk::caller()).unwrap();
 
     state::read(|s| {
         if let Some(api_key) = s.api_key_registry().get_key_with_required_permissions(
-            &ActionScope::Chat(args.chat),
+            &ActionScope::Chat(mon.chat),
             &BotPermissions::text_only(),
         ).cloned() {
-            ic_cdk::futures::spawn(
-                send_message(api_key.to_context(), args.chat)
+            ic_cdk::spawn(
+                send_messages(
+                    api_key.to_context(), 
+                    mon.chat, 
+                    args.messages
+                )
             )
         }
     });
@@ -26,13 +33,16 @@ pub async fn notify_events(
     Ok(())
 }
 
-async fn send_message(
+async fn send_messages(
     ctx: BotApiKeyContext,
-    chat: Chat
+    chat: Chat,
+    messages: Vec<String>
 ) {
+    let text = messages.join("\n  ---\n  ");
+    
     match OPENCHAT_CLIENT_FACTORY
         .build(ctx)
-        .send_message(MessageContentInitial::Text(TextContent { text: "hey!".to_string() }))
+        .send_message(MessageContentInitial::Text(TextContent { text }))
         .with_channel_id(chat.channel_id())
         .with_block_level_markdown(true)
         .execute_async()
@@ -40,10 +50,10 @@ async fn send_message(
     {
         Ok(send_message::Response::Success(_)) => (),
         Err((code, message)) => {
-            ic_cdk::println!("error: Failed to send event: code({}): message({})", code, message);
+            ic_cdk::println!("error: Failed to send events: code({}): message({})", code, message);
         }
         other => {
-            ic_cdk::println!("error: Failed to send event {:?}", other);
+            ic_cdk::println!("error: Failed to send events {:?}", other);
         }
     }
 }

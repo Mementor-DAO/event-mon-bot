@@ -14,6 +14,4 @@ ic-stable-structures = {workspace = true}
 serde = {workspace = true}
 serde_json = {workspace = true}
 rmp-serde = {workspace = true}
-oc_bots_sdk = {workspace = true}
-oc_bots_sdk_canister = {workspace = true}
 monitor_api = {path = "../api"}

@@ -7,5 +7,3 @@ edition.workspace = true
 candid = {workspace = true}
 ic-cdk = {workspace = true}
 serde = {workspace = true}
-oc_bots_sdk = {workspace = true}
-oc_bots_sdk_canister = {workspace = true}

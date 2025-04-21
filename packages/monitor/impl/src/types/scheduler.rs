@@ -3,14 +3,8 @@ use serde::{Deserialize, Serialize};
 
 pub type JobId = u64;
 
-#[allow(unused)]
-pub enum JobType {
-    Recurring,
-    Once,
-}
-
 pub trait Schedulable<T> {
-    fn ty(&self) -> JobType;
+    fn repeat(&self) -> bool;
     fn interval(&self) -> u64;
 }
 

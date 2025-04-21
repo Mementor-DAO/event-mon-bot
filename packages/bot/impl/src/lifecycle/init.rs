@@ -10,7 +10,7 @@ fn init(
     let state = State::new(
         args.administrator,
         args.oc_public_key,
-        args.chat
+        args.monitor_wasm,
     );
     setup(
         state

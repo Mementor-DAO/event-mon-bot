@@ -2,9 +2,9 @@ use std::{collections::HashSet, sync::LazyLock};
 use async_trait::async_trait;
 use candid::{Encode, Principal};
 use clap::Parser;
-use ic_cdk::management_canister::{
+use ic_cdk::api::management_canister::main::{
     CanisterInstallMode, CanisterSettings, 
-    CreateCanisterArgs, InstallCodeArgs, LogVisibility
+    CreateCanisterArgument, InstallCodeArgument, LogVisibility
 };
 use monitor_api::lifecycle::init::InitOrUpgradeArgs;
 use oc_bots_sdk::{
@@ -152,44 +152,41 @@ impl EventsMonCli {
             return Err(format!("Monitor already deployed. Canister id: {}", mon.canister_id))
         }
 
-        let canister_id = ic_cdk::management_canister::create_canister_with_extra_cycles(
-            &CreateCanisterArgs {
+        let canister_id = ic_cdk::api::management_canister::main::create_canister(
+            CreateCanisterArgument {
                 settings: Some(CanisterSettings{
-                    controllers: Some(vec![ic_cdk::api::canister_self()]),
+                    controllers: Some(vec![ic_cdk::api::id()]),
                     compute_allocation: None,
                     memory_allocation: None,
                     freezing_threshold: None,
                     reserved_cycles_limit: None,
                     log_visibility: Some(LogVisibility::Public),
                     wasm_memory_limit: None,
-                    wasm_memory_threshold: None,
                 }),
             }, 
             DEPLOY_MONITOR_CYCLES
         ).await
-            .map_err(|e| e.to_string())?
-            .canister_id;
+            .map_err(|e| e.1)?
+            .0.canister_id;
 
-        let (administrator, chat, wasm_module) = state::read(|s| 
+        let (administrator, wasm_module) = state::read(|s| 
             (
                 s.administrator().clone(),
-                s.chat().clone(),
-                s.monitor_wasm().unwrap().image.clone()
+                s.monitor_wasm().image.clone()
             )
         );
-        let bot_canister_id = ic_cdk::api::canister_self();
+        let bot_canister_id = ic_cdk::id();
 
-        ic_cdk::management_canister::install_code(&InstallCodeArgs {
+        ic_cdk::api::management_canister::main::install_code(InstallCodeArgument {
             mode: CanisterInstallMode::Install,
             canister_id,
             wasm_module,
             arg: Encode!(&InitOrUpgradeArgs { 
                 administrator, 
                 bot_canister_id,
-                chat,
             }).unwrap()
         }).await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| e.1)?;
 
         MonitorStorage::save(id, Monitor{
             chat,

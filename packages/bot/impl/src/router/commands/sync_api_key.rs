@@ -5,13 +5,17 @@ use oc_bots_sdk::{
 use crate::state;
 
 pub fn callback(cxt: BotCommandContext) -> CommandResponse {
-    let api_key = cxt.command.arg("api_key");
+    let api_key: String = cxt.command.arg("api_key");
 
-    state::mutate(|state| match state.api_key_registry_mut().insert(api_key) {
-        Ok(()) => CommandResponse::Success(SuccessResult { message: None }),
-        Err(err) => {
-            ic_cdk::println!("API key invalid: {:?}", err);
-            CommandResponse::BadRequest(BadRequest::AccessTokenInvalid(err))
+    state::mutate(|s| {
+        match s.api_key_registry_mut().insert(api_key.clone()) {
+            Ok(()) => {
+                CommandResponse::Success(SuccessResult { message: None })
+            },
+            Err(err) => {
+                ic_cdk::println!("API key invalid: {:?}", err);
+                CommandResponse::BadRequest(BadRequest::AccessTokenInvalid(err))
+            }
         }
     })
 }

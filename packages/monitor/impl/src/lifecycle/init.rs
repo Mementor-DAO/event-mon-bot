@@ -9,9 +9,9 @@ fn init(
 ) {
     let state = State::new(
         args.administrator,
-        args.bot_canister_id, 
-        args.chat,
+        args.bot_canister_id
     );
+
     setup(
         state
     ).unwrap();

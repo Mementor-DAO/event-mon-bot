@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, CandidType)]
 pub struct UpdateMonitorArgs {
-    pub image: Vec<u8>,
+    pub wasm: Vec<u8>,
 }
 
 #[derive(Serialize, CandidType)]

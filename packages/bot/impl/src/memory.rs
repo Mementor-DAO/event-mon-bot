@@ -5,6 +5,7 @@ use ic_stable_structures::{
 
 const UPGRADES: MemoryId            = MemoryId::new(0);
 const MONITORS: MemoryId            = MemoryId::new(1);
+const CAN_TO_MON_ID: MemoryId       = MemoryId::new(2);
 
 pub type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -23,4 +24,8 @@ pub fn get_upgrades_memory() -> Memory {
 
 pub fn get_monitors_memory() -> Memory {
     get_memory(MONITORS)
+}
+
+pub fn get_can_to_mon_id_memory() -> Memory {
+    get_memory(CAN_TO_MON_ID)
 }

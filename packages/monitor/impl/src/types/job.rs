@@ -1,33 +1,35 @@
-use candid::{CandidType, Principal};
+use std::borrow::Cow;
+use candid::{CandidType, Decode, Encode, Principal};
+use ic_stable_structures::{storable::Bound, Storable};
 use serde::{Deserialize, Serialize};
-use super::scheduler::{JobType, Schedulable};
+use super::scheduler::Schedulable;
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub struct MonCanister {
+pub struct JobCanister {
     pub canister_id: Principal,
     pub method_name: String,
     pub output_template: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub enum MonType {
-    Canister(MonCanister)
+pub enum JobType {
+    Canister(JobCanister)
 }
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub enum MonState {
+pub enum JobState {
     Idle,
     Running,
 }
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
-pub struct Mon {
-    pub ty: MonType,
+pub struct Job {
+    pub ty: JobType,
     pub interval: u32,
-    pub state: MonState,
+    pub state: JobState,
 }
 
-impl Mon {
+impl Job {
     pub fn canister(
         canister_id: Principal, 
         method_name: String, 
@@ -35,22 +37,22 @@ impl Mon {
         interval: u32
     ) -> Self {
         Self {
-            ty: MonType::Canister(MonCanister{
+            ty: JobType::Canister(JobCanister{
                 canister_id,
                 method_name,
                 output_template,
             }),
             interval,
-            state: MonState::Running,
+            state: JobState::Running,
         }
     }
 }
 
-impl Schedulable<Mon> for Mon {
-    fn ty(
+impl Schedulable<Job> for Job {
+    fn repeat(
         &self
-    ) -> JobType {
-        JobType::Recurring
+    ) -> bool {
+        true
     }
 
     fn interval(
@@ -58,4 +60,20 @@ impl Schedulable<Mon> for Mon {
     ) -> u64 {
         (self.interval as u64) * 1_000
     }
+}
+
+impl Storable for Job {
+    fn to_bytes(
+        &self
+    ) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+
+    fn from_bytes(
+        bytes: Cow<[u8]>
+    ) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+
+    const BOUND: Bound = Bound::Unbounded;
 }

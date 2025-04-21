@@ -1,6 +1,6 @@
 use std::{cell::RefCell, io::Write};
 use candid::Principal;
-use oc_bots_sdk::{types::Chat, ApiKeyRegistry};
+use oc_bots_sdk::ApiKeyRegistry;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -33,8 +33,7 @@ pub struct State {
     oc_public_key: String,
     administrator: Principal,
     api_key_registry: ApiKeyRegistry,
-    chat: Chat,
-    monitor_wasm: Option<MonitorWasm>,
+    monitor_wasm: MonitorWasm,
 }
 
 thread_local! {
@@ -83,14 +82,13 @@ impl State {
     pub fn new(
         administrator: Principal,
         oc_public_key: String,
-        chat: Chat
+        wasm: Vec<u8>
     ) -> Self {
         Self {
             oc_public_key,
             administrator,
             api_key_registry: ApiKeyRegistry::default(),
-            chat,
-            monitor_wasm: None,
+            monitor_wasm: MonitorWasm::new(wasm),
         }
     }
 
@@ -134,20 +132,14 @@ impl State {
     
     pub fn monitor_wasm(
         &self
-    ) -> Option<&MonitorWasm> {
-        self.monitor_wasm.as_ref()
+    ) -> &MonitorWasm {
+        &self.monitor_wasm
     }
     
     pub fn set_monitor_wasm(
         &mut self, 
-        monitor_wasm: Option<MonitorWasm>
+        monitor_wasm: MonitorWasm
     ) {
         self.monitor_wasm = monitor_wasm;
-    }
-    
-    pub fn chat(
-        &self
-    ) -> Chat {
-        self.chat
     }
 }
