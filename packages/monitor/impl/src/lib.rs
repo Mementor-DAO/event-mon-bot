@@ -11,7 +11,10 @@ mod storage;
 use getrandom::register_custom_getrandom;
 use monitor_api::{
     lifecycle::init::*, 
-    updates::add_job::*
+    updates::{
+        add_job::*, 
+        del_job::*
+    }
 };
 
 ic_cdk::export_candid!();

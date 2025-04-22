@@ -26,10 +26,18 @@ impl JobStorage {
     }
 
     pub fn load(
-        id: &JobId
+        id: JobId
     ) -> Option<Job> {
         JOBS.with_borrow(|jobs| {
             jobs.get(&id)
         })
+    }
+
+    pub fn remove(
+        id: JobId
+    ) {
+        JOBS.with_borrow_mut(|jobs| {
+            jobs.remove(&id);
+        });
     }
 }

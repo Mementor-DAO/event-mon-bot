@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::{
     lifecycle::READER_WRITER_BUFFER_SIZE, 
     memory::get_upgrades_memory, 
-    state::State,
+    state::{MonitorWasm, State},
 };
 use super::setup;
 
@@ -20,6 +20,7 @@ fn post_upgrade(
     let mut state = State::deserialize(&mut deserializer).unwrap();
     state.set_administrator(args.administrator.clone());
     state.set_oc_public_key(args.oc_public_key.clone());
+    state.set_monitor_wasm(MonitorWasm::new(args.monitor_wasm));
 
     setup(
         state

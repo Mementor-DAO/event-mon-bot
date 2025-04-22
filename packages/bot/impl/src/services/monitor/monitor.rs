@@ -1,18 +1,147 @@
 use candid::{Encode, Principal};
 use ic_cdk::api::management_canister::main::{
-    install_code, start_canister, stop_canister, 
-    CanisterIdRecord, CanisterInstallMode, InstallCodeArgument
+    create_canister, install_code, start_canister, stop_canister, 
+    CanisterIdRecord, CanisterInstallMode, CanisterSettings, 
+    CreateCanisterArgument, InstallCodeArgument, LogVisibility
 };
-use monitor_api::lifecycle::init::InitOrUpgradeArgs;
+use monitor_api::{
+    lifecycle::init::InitOrUpgradeArgs, 
+    updates::{
+        add_job::{AddJobArgs, AddJobResult, JobId}, 
+        del_job::{DelJobArgs, DelJobResult}
+    }
+};
+use oc_bots_sdk::types::Chat;
 use crate::{
     state::MonitorWasm, 
     storage::monitor::MonitorStorage, 
-    types::monitor::MonitorState
+    types::monitor::{Monitor, MonitorId, MonitorState}, 
+    DEPLOY_MONITOR_CYCLES
 };
+
+const MIN_INTERVAL: u32 = 15;
+const MAX_INTERVAL: u32 = 60;
 
 pub struct MonitorService;
 
 impl MonitorService {
+    pub async fn deploy(
+        chat: Chat,
+        administrator: Principal,
+        wasm: MonitorWasm
+    ) -> Result<Principal, String> {
+        let mon_id = chat.into();
+        
+        if let Some(mon) = MonitorStorage::load(&mon_id) {
+            return Err(format!("Monitor already deployed. Canister id: {}", mon.canister_id))
+        }
+        
+        let bot_canister_id = ic_cdk::id();
+
+        let canister_id = create_canister(
+            CreateCanisterArgument {
+                settings: Some(CanisterSettings{
+                    controllers: Some(vec![
+                        bot_canister_id,
+                        administrator
+                    ]),
+                    compute_allocation: None,
+                    memory_allocation: None,
+                    freezing_threshold: None,
+                    reserved_cycles_limit: None,
+                    log_visibility: Some(LogVisibility::Public),
+                    wasm_memory_limit: None,
+                }),
+            }, 
+            DEPLOY_MONITOR_CYCLES
+        ).await
+            .map_err(|e| e.1)?
+            .0.canister_id;
+
+        ic_cdk::api::management_canister::main::install_code(InstallCodeArgument {
+            mode: CanisterInstallMode::Install,
+            canister_id,
+            wasm_module: wasm.image,
+            arg: Encode!(&InitOrUpgradeArgs { 
+                administrator, 
+                bot_canister_id,
+            }).unwrap()
+        }).await
+            .map_err(|e| e.1)?;
+
+        MonitorStorage::save(
+            mon_id, 
+            Monitor::new(chat, canister_id, wasm.hash)
+        );
+
+        Ok(canister_id)
+    }
+
+    pub async fn add_canister_job(
+        mon_id: MonitorId,
+        canister_id: Principal,
+        method_name: String,
+        output_template: String,
+        interval: u32
+    ) -> Result<JobId, String> {
+        let mut mon = if let Some(mon) = MonitorStorage::load(&mon_id) {
+            mon
+        }
+        else {
+            return Err(format!("Unknown monitor id: {}", mon_id));
+        };
+
+        if interval < MIN_INTERVAL {
+            return Err(format!("Interval too low. Min: {}", MIN_INTERVAL));
+        }
+        else if interval > MAX_INTERVAL {
+            return Err(format!("Interval too high. Max: {}", MAX_INTERVAL));
+        }
+        
+        let job_id = ic_cdk::call::<(AddJobArgs, ), (AddJobResult, )>(
+            mon.canister_id, 
+            "add_job", 
+            (AddJobArgs {
+                canister_id,
+                method_name,
+                output_template,
+                offset: 0,
+                size: 8,
+                interval,
+            }, )
+        ).await.map_err(|e| e.1)?.0?;
+
+        mon.jobs.push(job_id);
+        MonitorStorage::save(mon_id, mon);
+
+        Ok(job_id)
+    }
+
+    pub async fn del_job(
+        mon_id: MonitorId,
+        job_id: JobId
+    ) -> Result<(), String> {
+        let mut mon = if let Some(mon) = MonitorStorage::load(&mon_id) {
+            mon
+        }
+        else {
+            return Err("Unknown monitor id".to_string());
+        };
+
+        ic_cdk::call::<(DelJobArgs, ), (DelJobResult, )>(
+            mon.canister_id, 
+            "delete_job", 
+            (DelJobArgs {
+                job_id,
+            },)
+        ).await.map_err(|e| e.1)?.0?;
+
+        mon.jobs.retain(|id| *id == job_id);
+        MonitorStorage::save(mon_id, mon);
+
+        Ok(())
+    }
+
     pub async fn start_all(
     ) {
         MonitorStorage::for_each(async |id, mut mon| {

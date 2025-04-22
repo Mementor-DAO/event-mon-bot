@@ -6,9 +6,14 @@ type AddJobArgs = record {
   method_name : text;
   output_template : text;
 };
+type DelJobArgs = record { job_id : nat64 };
 type InitOrUpgradeArgs = record {
   bot_canister_id : principal;
   administrator : principal;
 };
 type Result = variant { Ok : nat64; Err : text };
-service : (InitOrUpgradeArgs) -> { add_job : (AddJobArgs) -> (Result) }
+type Result_1 = variant { Ok; Err : text };
+service : (InitOrUpgradeArgs) -> {
+  add_job : (AddJobArgs) -> (Result);
+  delete_job : (DelJobArgs) -> (Result_1);
+}

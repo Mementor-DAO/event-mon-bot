@@ -2,17 +2,26 @@ use std::collections::BTreeMap;
 use bot_api::updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse};
 use candid::Principal;
 use icrc_ledger_types::icrc::generic_value::Value;
-use crate::{state, storage::job::job::JobStorage, types::{job::{Job, JobType}, scheduler::JobId}};
+use crate::{
+    state, 
+    storage::job::job::JobStorage, 
+    types::{
+        job::{Job, JobType}, 
+        scheduler::JobId
+    }
+};
 
 pub struct JobManager;
 
 impl JobManager {
-    pub fn new(
+    pub fn add(
         job: Job
     ) -> Result<JobId, String> {
+        let now = ic_cdk::api::time() / 1_000_000;
+
         match state::mutate(|s| {
             let scheduler = s.scheduler_mut();
-            match scheduler.add(job.clone().into(), ic_cdk::api::time() / 1_000_000) {
+            match scheduler.add(job.clone().into(), now) {
                 Ok((job_id, next_due)) => {
                     JobStorage::save(job_id, job);
                     Ok((job_id, next_due))
@@ -40,10 +49,24 @@ impl JobManager {
         }
     }
 
+    pub fn delete(
+        job_id: JobId
+    ) -> Result<(), String> {
+        state::mutate(|s| {
+            s.scheduler_mut()
+                .delete(job_id)
+        })?;
+
+        JobStorage::remove(job_id);
+
+        Ok(())
+    }
+
     pub fn start_if_required(
     ) {
         state::read(|s| {
-            s.scheduler().start_if_required(Self::timer_cb);
+            s.scheduler()
+                .start_if_required(Self::timer_cb);
         });
     }
 
@@ -60,7 +83,7 @@ impl JobManager {
     async fn job_cb(
         job_id: JobId
     ) {    
-        if let Some(mut job) = JobStorage::load(&job_id) {
+        if let Some(mut job) = JobStorage::load(job_id) {
             match job.ty.clone() {
                 JobType::Canister(can) => {
                     match Self::query_canister(

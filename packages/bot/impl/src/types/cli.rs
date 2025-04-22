@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use monitor_api::updates::add_job::JobId;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -26,17 +27,17 @@ pub enum Commands {
     #[command(about = "Start a job")]
     Start {
         #[arg(help = "Job id")]
-        id: String
+        id: JobId
     },
     #[command(about = "Stop a job")]
     Stop {
         #[arg(help = "Job id")]
-        id: String
+        id: JobId
     },
     #[command(about = "Delete a job")]
     Delete {
         #[arg(help = "Job id")]
-        id: String
+        id: JobId
     },
 }
 

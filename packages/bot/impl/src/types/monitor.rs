@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, fmt::Display};
 use candid::{CandidType, Decode, Encode, Principal};
 use ic_stable_structures::{storable::Bound, Storable};
 use monitor_api::updates::add_job::JobId;
@@ -13,6 +13,19 @@ impl From<Chat> for MonitorId {
         value: Chat
     ) -> Self {
         Self(value)
+    }
+}
+
+impl Display for MonitorId {
+    fn fmt(
+        &self, 
+        fmt: &mut std::fmt::Formatter<'_>
+    ) -> std::fmt::Result {
+        fmt.write_fmt(format_args!(
+            "{}.{}", 
+            self.0.canister_id(), 
+            self.0.channel_id().unwrap_or(0)
+        ))
     }
 }
 

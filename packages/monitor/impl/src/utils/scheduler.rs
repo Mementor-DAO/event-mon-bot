@@ -62,7 +62,7 @@ impl<T> Scheduler<T>
         TIMER_ID.set(None);
 
         let now = ic_cdk::api::time() / 1_000_000;
-        while let Some((_job, job_id)) = self.pop_next_due_job(now) {
+        while let Some(job_id) = self.pop_next_due_job(now) {
             ic_cdk::spawn(job_cb(job_id));
         }
 
@@ -110,7 +110,7 @@ impl<T> Scheduler<T>
     fn pop_next_due_job(
         &mut self, 
         now: u64
-    ) -> Option<(T, JobId)> {
+    ) -> Option<JobId> {
         let (timestamp, job_id) = self.peek()?;
 
         if timestamp > now {
@@ -121,17 +121,15 @@ impl<T> Scheduler<T>
 
         let job = self.jobs.get_mut(&job_id)?;
 
-        let job = if let Some(next) =
+        if let Some(next) =
             Self::next_job_time(&job, now) {
             self.ordered.insert((next, job_id));
-
-            job.clone()
         } 
         else {
-            self.jobs.remove(&job_id).unwrap()
-        };
+            self.jobs.remove(&job_id).unwrap();
+        }
 
-        Some((job, job_id))
+        Some(job_id)
     }
 
     #[allow(unused)]

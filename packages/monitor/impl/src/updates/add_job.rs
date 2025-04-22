@@ -14,7 +14,7 @@ pub fn add_job(
         args.interval
     );
 
-    match JobManager::new(job) {
+    match JobManager::add(job) {
         Ok(job_id) =>  {
             Ok(job_id)
         }

@@ -1,12 +1,8 @@
 use std::{collections::HashSet, sync::LazyLock};
 use async_trait::async_trait;
-use candid::{Encode, Principal};
+use candid::Principal;
 use clap::Parser;
-use ic_cdk::api::management_canister::main::{
-    CanisterInstallMode, CanisterSettings, 
-    CreateCanisterArgument, InstallCodeArgument, LogVisibility
-};
-use monitor_api::{lifecycle::init::InitOrUpgradeArgs, updates::add_job::{AddJobArgs, AddJobResult}};
+use monitor_api::updates::add_job::JobId;
 use oc_bots_sdk::{
     api::{
         command::{
@@ -22,22 +18,14 @@ use oc_bots_sdk::{
         Chat, ChatRole, MessageContentInitial
     }
 };
-use oc_bots_sdk_canister::
-    CanisterRuntime
-;
+use oc_bots_sdk_canister::CanisterRuntime;
 use crate::{
+    services::monitor::MonitorService, 
     state, 
-    storage::monitor::MonitorStorage, 
-    types::{
-        cli::{Cli, Commands, CreateSubcommand}, 
-        monitor::{Monitor, MonitorId}
-    }, DEPLOY_MONITOR_CYCLES
+    types::cli::{Cli, Commands, CreateSubcommand}
 };
 
 static DEFINITION: LazyLock<BotCommandDefinition> = LazyLock::new(EventsMonCli::definition);
-
-const MIN_INTERVAL: u32 = 15;
-const MAX_INTERVAL: u32 = 60;
 
 pub struct EventsMonCli;
 
@@ -109,8 +97,8 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                     Commands::Stop { .. } => {
                         todo!()
                     },
-                    Commands::Delete { .. } => {
-                        todo!()
+                    Commands::Delete { id } => {
+                        Self::delete_job(id, chat, &client).await
                     },
                 }
             },
@@ -150,53 +138,14 @@ impl EventsMonCli {
         chat: Chat,
         client: &Client<CanisterRuntime, BotCommandContext>
     ) -> Result<SuccessResult, String> {
-        let id = MonitorId::from(chat);
-        if let Some(mon) = MonitorStorage::load(&id) {
-            return Err(format!("Monitor already deployed. Canister id: {}", mon.canister_id))
-        }
-
-        let admin = state::read(|s| s.administrator().clone());
-
-        let canister_id = ic_cdk::api::management_canister::main::create_canister(
-            CreateCanisterArgument {
-                settings: Some(CanisterSettings{
-                    controllers: Some(vec![
-                        ic_cdk::api::id(),
-                        admin
-                    ]),
-                    compute_allocation: None,
-                    memory_allocation: None,
-                    freezing_threshold: None,
-                    reserved_cycles_limit: None,
-                    log_visibility: Some(LogVisibility::Public),
-                    wasm_memory_limit: None,
-                }),
-            }, 
-            DEPLOY_MONITOR_CYCLES
-        ).await
-            .map_err(|e| e.1)?
-            .0.canister_id;
-
         let (administrator, wasm) = state::read(|s| 
             (
                 s.administrator().clone(),
                 s.monitor_wasm().clone()
             )
         );
-        let bot_canister_id = ic_cdk::id();
-
-        ic_cdk::api::management_canister::main::install_code(InstallCodeArgument {
-            mode: CanisterInstallMode::Install,
-            canister_id,
-            wasm_module: wasm.image,
-            arg: Encode!(&InitOrUpgradeArgs { 
-                administrator, 
-                bot_canister_id,
-            }).unwrap()
-        }).await
-            .map_err(|e| e.1)?;
-
-        MonitorStorage::save(id, Monitor::new(chat, canister_id, wasm.hash));
+        
+        let canister_id = MonitorService::deploy(chat, administrator, wasm).await?;
 
         Ok(EphemeralMessageBuilder::new(
             MessageContentInitial::from_text(format!("Monitor deployed! Canister id: {}", canister_id)),
@@ -215,42 +164,32 @@ impl EventsMonCli {
 
         let canister_id = Principal::from_text(canister_id).unwrap();
 
-        let mut mon = if let Some(mon) = MonitorStorage::load(&chat.into()) {
-            mon
-        }
-        else {
-            return Err("No monitor deployed. Please use '/eventmon deploy' first".to_string());
-        };
-
-        if interval < MIN_INTERVAL {
-            return Err(format!("Interval to low. Min: {}", MIN_INTERVAL));
-        }
-        else if interval > MAX_INTERVAL {
-            return Err(format!("Interval to high. Max: {}", MAX_INTERVAL));
-        }
-
-        let job_id = ic_cdk::call::<(AddJobArgs, ), (AddJobResult, )>(
-            mon.canister_id, 
-            "add_job", 
-            (AddJobArgs {
-                canister_id,
-                method_name,
-                output_template,
-                offset: 0,
-                size: 8,
-                interval,
-            }, )
-        ).await.map_err(|e| e.1)?.0?;
-
-        mon.jobs.push(job_id);
-        MonitorStorage::save(chat.into(), mon);
+        let job_id = MonitorService::add_canister_job(
+            chat.into(), canister_id, method_name, output_template, interval
+        ).await?;
 
         Ok(
             EphemeralMessageBuilder::new(
                 MessageContentInitial::from_text(format!("New job with id {} created!", job_id)),
                 client.context().message_id().unwrap(),
             )
-            .with_block_level_markdown(true)
+            .build()
+            .into()
+        )
+    }
+
+    async fn delete_job(
+        job_id: JobId, 
+        chat: Chat,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+        MonitorService::del_job(chat.into(), job_id).await?;
+
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::from_text(format!("Job {} deleted!", job_id)),
+                client.context().message_id().unwrap(),
+            )
             .build()
             .into()
         )
