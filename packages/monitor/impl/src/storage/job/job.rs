@@ -40,4 +40,16 @@ impl JobStorage {
             jobs.remove(&id);
         });
     }
+
+    pub fn list(
+        offset: usize,
+        size: usize
+    ) -> Vec<(JobId, Job)> {
+        JOBS.with_borrow(|monitors| {
+            monitors.iter()
+                .skip(offset)
+                .take(size)
+                .collect::<Vec<_>>()
+        })
+    }
 }

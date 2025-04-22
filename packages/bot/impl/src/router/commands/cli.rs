@@ -88,8 +88,9 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                             }
                         }
                     },
-                    Commands::List { .. } => {
-                        todo!()
+                    Commands::List { page } => {
+                        Self::list_jobs(page.max(1) - 1, chat, &client)
+                            .await
                     },
                     Commands::Start { .. } => {
                         todo!()
@@ -98,7 +99,8 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                         todo!()
                     },
                     Commands::Delete { id } => {
-                        Self::delete_job(id, chat, &client).await
+                        Self::delete_job(id, chat, &client)
+                            .await
                     },
                 }
             },
@@ -190,6 +192,39 @@ impl EventsMonCli {
                 MessageContentInitial::from_text(format!("Job {} deleted!", job_id)),
                 client.context().message_id().unwrap(),
             )
+            .build()
+            .into()
+        )
+    }
+
+    async fn list_jobs(
+        page: u32,
+        chat: Chat,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+
+        let list = MonitorService::list_jobs(
+            chat.into(), page
+        ).await?;
+
+        let text = list.iter()
+            .map(|j| format!(
+                "**Job ({})**:\n  - interval: {}s\n  - state: {}\n  - type: {}\n  - template: ```{}```", 
+                j.id, 
+                j.interval, 
+                j.state, 
+                j.ty, 
+                j.output_template
+            ))
+            .collect::<Vec<_>>()
+            .join("\n  ");
+
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::from_text(text),
+                client.context().message_id().unwrap(),
+            )
+            .with_block_level_markdown(true)
             .build()
             .into()
         )

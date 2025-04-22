@@ -22,7 +22,7 @@ pub enum Commands {
     #[command(about = "List jobs")]
     List {
         #[arg(default_value_t = 1, help = "Optional page number (default = 1)")]
-        page: usize,
+        page: u32,
     },
     #[command(about = "Start a job")]
     Start {

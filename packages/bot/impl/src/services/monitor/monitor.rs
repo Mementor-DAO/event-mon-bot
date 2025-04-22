@@ -5,8 +5,7 @@ use ic_cdk::api::management_canister::main::{
     CreateCanisterArgument, InstallCodeArgument, LogVisibility
 };
 use monitor_api::{
-    lifecycle::init::InitOrUpgradeArgs, 
-    updates::{
+    lifecycle::init::InitOrUpgradeArgs, queries::list_jobs::{Job, ListJobsArgs, ListJobsResult}, updates::{
         add_job::{AddJobArgs, AddJobResult, JobId}, 
         del_job::{DelJobArgs, DelJobResult}
     }
@@ -21,6 +20,7 @@ use crate::{
 
 const MIN_INTERVAL: u32 = 15;
 const MAX_INTERVAL: u32 = 60;
+const ITEMS_PER_PAGE: u32 = 16;
 
 pub struct MonitorService;
 
@@ -140,6 +140,29 @@ impl MonitorService {
         MonitorStorage::save(mon_id, mon);
 
         Ok(())
+    }
+
+    pub async fn list_jobs(
+        mon_id: MonitorId,
+        page: u32
+    ) -> Result<Vec<Job>, String> {
+        let mon = if let Some(mon) = MonitorStorage::load(&mon_id) {
+            mon
+        }
+        else {
+            return Err("Unknown monitor id".to_string());
+        };
+
+        let jobs = ic_cdk::call::<(ListJobsArgs, ), (ListJobsResult, )>(
+            mon.canister_id, 
+            "list_jobs", 
+            (ListJobsArgs {
+                offset: page * ITEMS_PER_PAGE,
+                size: ITEMS_PER_PAGE
+            },)
+        ).await.map_err(|e| e.1)?.0?;
+
+        Ok(jobs)
     }
 
     pub async fn start_all(

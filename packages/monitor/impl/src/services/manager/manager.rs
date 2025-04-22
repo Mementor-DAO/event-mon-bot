@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 use bot_api::updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse};
 use candid::Principal;
 use icrc_ledger_types::icrc::generic_value::Value;
+use monitor_api::types::job::JobType;
 use crate::{
     state, 
     storage::job::job::JobStorage, 
     types::{
-        job::{Job, JobType}, 
+        job::Job, 
         scheduler::JobId
     }
 };
@@ -61,6 +62,23 @@ impl JobManager {
 
         Ok(())
     }
+
+    pub fn list(
+        offset: usize,
+        size: usize
+    ) -> Vec<monitor_api::queries::list_jobs::Job> {
+        JobStorage::list(offset, size).iter()
+            .cloned()
+            .map(|(id, job)| monitor_api::queries::list_jobs::Job {
+                id,
+                ty: job.ty,
+                output_template: job.output_template,
+                interval: job.interval,
+                state: job.state,
+            })
+            .collect()
+    }
+    
 
     pub fn start_if_required(
     ) {
@@ -156,5 +174,4 @@ impl JobManager {
 
         Ok(())
     }
-    
 }

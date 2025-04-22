@@ -4,6 +4,7 @@ mod utils;
 mod guards;
 mod lifecycle;
 mod updates;
+mod queries;
 mod memory;
 mod services;
 mod storage;
@@ -14,7 +15,8 @@ use monitor_api::{
     updates::{
         add_job::*, 
         del_job::*
-    }
+    },
+    queries::list_jobs::*
 };
 
 ic_cdk::export_candid!();

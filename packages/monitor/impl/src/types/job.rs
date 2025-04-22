@@ -1,24 +1,8 @@
 use std::borrow::Cow;
 use candid::{CandidType, Decode, Encode, Principal};
 use ic_stable_structures::{storable::Bound, Storable};
+use monitor_api::types::job::{JobCanister, JobState, JobType};
 use serde::{Deserialize, Serialize};
-
-#[derive(Clone, Serialize, Deserialize, CandidType)]
-pub struct JobCanister {
-    pub canister_id: Principal,
-    pub method_name: String,
-}
-
-#[derive(Clone, Serialize, Deserialize, CandidType)]
-pub enum JobType {
-    Canister(JobCanister)
-}
-
-#[derive(Clone, Serialize, Deserialize, CandidType)]
-pub enum JobState {
-    Idle,
-    Running,
-}
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
 pub struct Job {
