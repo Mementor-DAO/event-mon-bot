@@ -2,6 +2,7 @@ use std::{collections::HashSet, sync::LazyLock};
 use async_trait::async_trait;
 use candid::Principal;
 use clap::Parser;
+use ic_ledger_types::{AccountIdentifier, DEFAULT_FEE};
 use monitor_api::updates::add_job::JobId;
 use oc_bots_sdk::{
     api::{
@@ -20,7 +21,17 @@ use oc_bots_sdk::{
 };
 use oc_bots_sdk_canister::CanisterRuntime;
 use crate::{
-    services::{monitor::MonitorService, wallet::wallet::WalletService}, state, storage::user::UserStorage, types::{cli::{Cli, Commands, CreateSubcommand, Wallet}, user::UserTransaction}
+    consts::DEPLOY_MONITOR_COST, 
+    services::{
+        monitor::MonitorService, 
+        wallet::wallet::WalletService
+    }, 
+    state, 
+    storage::user::UserStorage, 
+    types::{
+        cli::{Cli, Commands, CreateSubcommand, Wallet, Job}, 
+        user::{UserId, UserTransaction}
+    }
 };
 
 static DEFINITION: LazyLock<BotCommandDefinition> = LazyLock::new(EventsMonCli::definition);
@@ -66,7 +77,7 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
             }
         })?;
 
-        let _user_id = Principal::from_text(
+        let user_id = Principal::from_text(
             ctx.command.initiator.to_string()
         ).unwrap();
 
@@ -75,40 +86,47 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                 match cli.command {
                     Commands::Deploy => {
                         Self::deploy_monitor(
+                            user_id,
                             chat,
                             &client
                         ).await
                     },
-                    Commands::Create ( subcommand ) => {
-                        match subcommand {
-                            CreateSubcommand::Canister { canister_id, method_name, output_template, interval } => {
-                                Self::create_canister_job(
-                                    canister_id, method_name, output_template, interval, chat, &client
-                                ).await
-                            }
+                    Commands::Status => {
+                        Self::monitor_status(
+                            chat,
+                            &client
+                        ).await
+                    },
+                    Commands::Job (command) => {
+                        match command {
+                            Job::Create ( subcommand ) => {
+                                match subcommand {
+                                    CreateSubcommand::Canister { canister_id, method_name, output_template, interval } => {
+                                        Self::create_canister_job(
+                                            canister_id, method_name, output_template, interval, chat, &client
+                                        ).await
+                                    }
+                                }
+                            },
+                            Job::List { page } => {
+                                Self::list_jobs(page.max(1) - 1, chat, &client)
+                                    .await
+                            },
+                            Job::Start { id } => {
+                                Self::start_job(id, chat, &client)
+                                    .await
+                            },
+                            Job::Stop { id } => {
+                                Self::stop_job(id, chat, &client)
+                                    .await
+                            },
+                            Job::Delete { id } => {
+                                Self::delete_job(id, chat, &client)
+                                    .await
+                            },
                         }
                     },
-                    Commands::List { page } => {
-                        Self::list_jobs(page.max(1) - 1, chat, &client)
-                            .await
-                    },
-                    Commands::Start { id } => {
-                        Self::start_job(id, chat, &client)
-                            .await
-                    },
-                    Commands::Stop { id } => {
-                        Self::stop_job(id, chat, &client)
-                            .await
-                    },
-                    Commands::Delete { id } => {
-                        Self::delete_job(id, chat, &client)
-                            .await
-                    },
                     Commands::Wallet (command) => {
-                        let user_id = Principal::from_text(
-                            client.context().command.initiator.to_string()
-                        ).unwrap();
-
                         match command {
                             Wallet::Balance => {
                                 Self::wallet_balance(user_id, &client)
@@ -166,6 +184,7 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
 
 impl EventsMonCli {
     async fn deploy_monitor(
+        user_id: UserId,
         chat: Chat,
         client: &Client<CanisterRuntime, BotCommandContext>
     ) -> Result<SuccessResult, String> {
@@ -175,8 +194,28 @@ impl EventsMonCli {
                 s.monitor_wasm().clone()
             )
         );
+
+        let cost = DEPLOY_MONITOR_COST;
+        let balance = WalletService::balance_of(user_id).await?;
+        if balance < cost {
+            let acc_id = WalletService::address_of(user_id);
+            return Err(
+                format!(
+                    "Your EventMon wallet balance of **{:.8}** ICP is too low to cover the current minting cost of **{:.8}** ICP\n  Please transfer enough ICP to this address: **{}**", 
+                    (balance as f32) / 100000000.0,
+                    (cost as f32) / 100000000.0,
+                    acc_id
+                )
+            );
+        }
         
         let canister_id = MonitorService::deploy(chat, administrator, wasm).await?;
+
+        WalletService::transfer(
+            None, 
+            AccountIdentifier::new(&ic_cdk::id(), &user_id.into()), 
+            cost + DEFAULT_FEE.e8s()
+        ).await?;
 
         Ok(EphemeralMessageBuilder::new(
             MessageContentInitial::from_text(format!("Monitor deployed! Canister id: {}", canister_id)),
@@ -281,6 +320,34 @@ impl EventsMonCli {
             ))
             .collect::<Vec<_>>()
             .join("\n  ");
+
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::from_text(text),
+                client.context().message_id().unwrap(),
+            )
+            .with_block_level_markdown(true)
+            .build()
+            .into()
+        )
+    }
+
+    async fn monitor_status(
+        chat: Chat,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+
+        let status = MonitorService::get_status(
+            chat.into()
+        ).await?;
+
+        let text = format!(
+            "- state: {}\n  - module hash: {}\n  - memory size: {}\n  - cycles available: **{:3.8}**",
+            status.status,
+            status.module_hash,
+            status.memory_size,
+            (status.cycles as f32) / 100000000.0
+        );
 
         Ok(
             EphemeralMessageBuilder::new(

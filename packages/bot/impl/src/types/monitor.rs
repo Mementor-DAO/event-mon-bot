@@ -74,6 +74,18 @@ pub enum MonitorState {
     Running
 }
 
+impl Display for MonitorState {
+    fn fmt(
+        &self, 
+        fmt: &mut std::fmt::Formatter<'_>
+    ) -> std::fmt::Result {
+        fmt.write_fmt(format_args!("{}", match self {
+            MonitorState::Idle => "idle",
+            MonitorState::Running => "running",
+        }))
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, CandidType)]
 pub struct Monitor {
     pub chat: Chat,
@@ -113,4 +125,13 @@ impl Storable for Monitor {
     }
 
     const BOUND: Bound = Bound::Unbounded;
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+pub struct MonitorStatus {
+    pub status: MonitorState,
+    pub module_hash: String,
+    pub memory_size: u128,
+    pub cycles: u128,
+    pub idle_cycles_burned_per_day: u128,
 }

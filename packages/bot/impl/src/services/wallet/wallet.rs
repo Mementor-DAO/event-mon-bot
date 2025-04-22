@@ -4,7 +4,6 @@ use ic_ledger_types::{
     Memo, Subaccount, Timestamp, Tokens, TransferArgs, 
     DEFAULT_FEE, DEFAULT_SUBACCOUNT, MAINNET_LEDGER_CANISTER_ID
 };
-
 use crate::{storage::user::UserStorage, types::user::UserTransaction};
 
 pub struct WalletService;
@@ -77,7 +76,7 @@ impl WalletService {
                 to, 
                 fee: DEFAULT_FEE.into(), 
                 created_at_time: Some(Timestamp{timestamp_nanos: now}), 
-                memo: Memo(0x4E4E), 
+                memo: Memo(0xE0E07001005), 
                 amount: Tokens::from_e8s(amount),
             }
         ).await

@@ -1,4 +1,5 @@
-use bot_api::updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse};
+use bot_api::{updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse}, NOTIFY_EVENT_COST};
+use ic_cdk::api::call::{msg_cycles_accept128, msg_cycles_available};
 use oc_bots_sdk::{
     oc_api::actions::{send_message, ActionArgsBuilder}, 
     types::{
@@ -13,6 +14,14 @@ use crate::{guards::*, state, storage::monitor::MonitorStorage};
 pub async fn notify_events(
     args: NotifiyEventsArgs
 ) -> NotifiyEventsResponse {
+    if msg_cycles_available() < NOTIFY_EVENT_COST {
+        let err = format!("Not enough cycles sent: {} < {}", msg_cycles_available(), NOTIFY_EVENT_COST);
+        ic_cdk::println!("error: {}", err);
+        return Err(err);
+    }
+
+    msg_cycles_accept128(NOTIFY_EVENT_COST as _);
+
     let mon = MonitorStorage::load_by_canister_id(&ic_cdk::caller()).unwrap();
 
     state::read(|s| {

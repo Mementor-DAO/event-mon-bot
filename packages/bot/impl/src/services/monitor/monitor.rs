@@ -2,20 +2,30 @@ use candid::{Encode, Principal};
 use ic_cdk::api::management_canister::main::{
     create_canister, install_code, start_canister, stop_canister, 
     CanisterIdRecord, CanisterInstallMode, CanisterSettings, 
-    CreateCanisterArgument, InstallCodeArgument, LogVisibility
+    CanisterStatusType, CreateCanisterArgument, InstallCodeArgument, LogVisibility
 };
 use monitor_api::{
-    lifecycle::init::InitOrUpgradeArgs, queries::list_jobs::{Job, ListJobsArgs, ListJobsResult}, updates::{
+    lifecycle::init::InitOrUpgradeArgs, 
+    queries::list_jobs::{Job, ListJobsArgs, ListJobsResult}, 
+    updates::{
         add_job::{AddJobArgs, AddJobResult, JobId}, 
-        del_job::{DelJobArgs, DelJobResult}, start_job::{StartJobArgs, StartJobResult}, stop_job::{StopJobArgs, StopJobResult}
+        del_job::{DelJobArgs, DelJobResult}, 
+        start_job::{StartJobArgs, StartJobResult}, 
+        stop_job::{StopJobArgs, StopJobResult}
     }
 };
 use oc_bots_sdk::types::Chat;
 use crate::{
+    consts::DEPLOY_MONITOR_COST, 
     state::MonitorWasm, 
     storage::monitor::MonitorStorage, 
-    types::monitor::{Monitor, MonitorId, MonitorState}, 
-    DEPLOY_MONITOR_CYCLES
+    types::monitor::{
+        Monitor, MonitorId, MonitorState, MonitorStatus
+    }, 
+    utils::{
+        ic::get_canister_status, 
+        nat::nat_to_u128
+    }
 };
 
 const MIN_INTERVAL: u32 = 15;
@@ -53,7 +63,7 @@ impl MonitorService {
                     wasm_memory_limit: None,
                 }),
             }, 
-            DEPLOY_MONITOR_CYCLES
+            DEPLOY_MONITOR_COST as _
         ).await
             .map_err(|e| e.1)?
             .0.canister_id;
@@ -207,6 +217,32 @@ impl MonitorService {
         ).await.map_err(|e| e.1)?.0?;
 
         Ok(jobs)
+    }
+
+    pub async fn get_status(
+        mon_id: MonitorId
+    ) -> Result<MonitorStatus, String> {
+        let mon = if let Some(mon) = MonitorStorage::load(&mon_id) {
+            mon
+        }
+        else {
+            return Err("Unknown monitor id".to_string());
+        };
+
+        let status = get_canister_status(mon.canister_id)
+            .await
+            .map(|s| MonitorStatus {
+                status: match s.status {
+                    CanisterStatusType::Running => MonitorState::Running,
+                    _ => MonitorState::Idle,
+                },
+                module_hash: hex::encode(s.module_hash.unwrap()),
+                memory_size: nat_to_u128(s.memory_size),
+                cycles: nat_to_u128(s.cycles),
+                idle_cycles_burned_per_day: nat_to_u128(s.idle_cycles_burned_per_day),
+            })?;
+
+        Ok(status)
     }
 
     pub async fn start_all(

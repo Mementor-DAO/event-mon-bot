@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use bot_api::updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse};
+use bot_api::{updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse}, NOTIFY_EVENT_COST};
 use candid::Principal;
 use icrc_ledger_types::icrc::generic_value::Value;
 use monitor_api::types::job::{JobState, JobType};
@@ -225,12 +225,13 @@ impl JobManager {
     ) -> Result<(), String> {
         let canister_id = state::read(|s| s.bot_canister_id().clone());
         
-        ic_cdk::call::<(NotifiyEventsArgs, ), (NotifiyEventsResponse, )>(
+        ic_cdk::api::call::call_with_payment128::<(NotifiyEventsArgs, ), (NotifiyEventsResponse, )>(
             canister_id, 
             "notify_events", 
             (NotifiyEventsArgs {
                 messages,
-            },)
+            },),
+            NOTIFY_EVENT_COST as _
         ).await
             .map_err(|e| e.1)?
             .0?;

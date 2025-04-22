@@ -15,9 +15,19 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    #[command(about = "Deploy a monitor canister for this channel/group")]
+    #[command(about = "Deploy a event monitor canister for this channel/group")]
     Deploy,
-    #[command(about = "Create a new job subcommands", subcommand)]
+    #[command(about = "Print the status of this channel/group's event monitor canister")]
+    Status,
+    #[command(subcommand, about = "Job sub-commands")]
+    Job (Job),
+    #[command(subcommand, about = "EventMon Wallet sub-commands")]
+    Wallet (Wallet),
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Job {
+    #[command(about = "Create new job subcommands", subcommand)]
     Create(CreateSubcommand),
     #[command(about = "List jobs")]
     List {
@@ -39,8 +49,6 @@ pub enum Commands {
         #[arg(help = "Job id")]
         id: JobId
     },
-    #[command(subcommand, about = "Sub-commands of the **EventMon Wallet**")]
-    Wallet (Wallet),
 }
 
 #[derive(Subcommand, Debug)]

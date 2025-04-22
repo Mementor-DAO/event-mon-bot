@@ -1,3 +1,4 @@
+mod consts;
 mod types;
 mod services;
 mod state;
@@ -15,7 +16,5 @@ use bot_api::{
     lifecycle::init::*,
     updates::{update_monitor::*, notify_events::*}
 };
-
-pub const DEPLOY_MONITOR_CYCLES: u128 = 1_000_000_000_000;
 
 ic_cdk::export_candid!();
