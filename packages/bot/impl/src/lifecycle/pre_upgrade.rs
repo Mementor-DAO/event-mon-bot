@@ -6,7 +6,7 @@ use ic_stable_structures::writer::{BufferedWriter, Writer};
 use serde::Serialize;
 
 #[pre_upgrade]
-fn pre_upgrade(
+async fn pre_upgrade(
 ) {
     let mut memory = get_upgrades_memory();
     let writer = BufferedWriter::new(READER_WRITER_BUFFER_SIZE, Writer::new(&mut memory, 0));

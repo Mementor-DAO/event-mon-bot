@@ -5,3 +5,5 @@ use serde::{Deserialize, Serialize};
 pub struct NotifiyEventsArgs{
     pub messages: Vec<String>,
 }
+
+pub type NotifiyEventsResponse = Result<(), String>;

@@ -1,14 +1,14 @@
-type Chat = variant {
-  Group : principal;
-  Channel : record { principal; nat32 };
-  Direct : principal;
+type AddJobArgs = record {
+  interval : nat32;
+  size : nat32;
+  canister_id : principal;
+  offset : nat32;
+  method_name : text;
+  output_template : text;
 };
 type InitOrUpgradeArgs = record {
-  chat : Chat;
-  oc_api_key : text;
   bot_canister_id : principal;
   administrator : principal;
 };
-type Result = variant { Ok; Err : text };
-type SyncApiKeyArgs = record { oc_api_key : text };
-service : (InitOrUpgradeArgs) -> { sync_api_key : (SyncApiKeyArgs) -> (Result) }
+type Result = variant { Ok : nat64; Err : text };
+service : (InitOrUpgradeArgs) -> { add_job : (AddJobArgs) -> (Result) }

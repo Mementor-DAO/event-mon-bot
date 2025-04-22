@@ -1,5 +1,5 @@
-use crate::
-    state::{self, State}
+use crate::{services::manager::manager::JobManager, 
+    state::{self, State}}
 ;
 
 pub mod init;
@@ -12,6 +12,8 @@ pub(crate) fn setup(
     state: State
 ) -> Result<(), String> {
     state::init(state);
+
+    JobManager::start_if_required();
 
     Ok(())
 }

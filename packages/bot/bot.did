@@ -1,8 +1,3 @@
-type Chat = variant {
-  Group : principal;
-  Channel : record { principal; nat32 };
-  Direct : principal;
-};
 type HttpRequest = record {
   url : text;
   method : text;
@@ -20,13 +15,14 @@ type InitOrUpgradeArgs = record {
   oc_public_key : text;
   administrator : principal;
 };
-type NotifiyEventsArgs = record { chat : Chat };
+type NotifiyEventsArgs = record { messages : vec text };
 type Result = variant { Ok; Err : text };
-type Result_1 = variant { Ok : record {}; Err : text };
 type UpdateMonitorArgs = record { wasm : blob };
 service : (InitOrUpgradeArgs) -> {
   http_request : (HttpRequest) -> (HttpResponse) query;
   http_request_update : (HttpRequest) -> (HttpResponse);
   notify_events : (NotifiyEventsArgs) -> (Result);
-  update_monitor : (UpdateMonitorArgs) -> (Result_1);
+  start_monitors : () -> ();
+  stop_monitors : () -> ();
+  update_monitors : (UpdateMonitorArgs) -> (Result);
 }

@@ -1242,10 +1242,13 @@ dependencies = [
 name = "monitor"
 version = "0.1.0"
 dependencies = [
+ "bot_api",
  "candid",
+ "getrandom",
  "ic-cdk 0.17.1",
  "ic-cdk-timers",
  "ic-stable-structures",
+ "icrc-ledger-types",
  "monitor_api",
  "rmp-serde",
  "serde",

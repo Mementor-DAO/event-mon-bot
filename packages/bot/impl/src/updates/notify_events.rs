@@ -1,4 +1,4 @@
-use bot_api::updates::notify_events::NotifiyEventsArgs;
+use bot_api::updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse};
 use oc_bots_sdk::{
     oc_api::actions::{send_message, ActionArgsBuilder}, 
     types::{
@@ -12,7 +12,7 @@ use crate::{guards::*, state, storage::monitor::MonitorStorage};
 #[ic_cdk::update(guard = "monitor_canister_only")]
 pub async fn notify_events(
     args: NotifiyEventsArgs
-) -> Result<(), String> {
+) -> NotifiyEventsResponse {
     let mon = MonitorStorage::load_by_canister_id(&ic_cdk::caller()).unwrap();
 
     state::read(|s| {
@@ -38,22 +38,24 @@ async fn send_messages(
     chat: Chat,
     messages: Vec<String>
 ) {
-    let text = messages.join("\n  ---\n  ");
-    
-    match OPENCHAT_CLIENT_FACTORY
-        .build(ctx)
-        .send_message(MessageContentInitial::Text(TextContent { text }))
-        .with_channel_id(chat.channel_id())
-        .with_block_level_markdown(true)
-        .execute_async()
-        .await
-    {
-        Ok(send_message::Response::Success(_)) => (),
-        Err((code, message)) => {
-            ic_cdk::println!("error: Failed to send events: code({}): message({})", code, message);
-        }
-        other => {
-            ic_cdk::println!("error: Failed to send events {:?}", other);
+    if messages.len() > 0 {
+        let text = messages.join("\n  ---\n  ").replace("\\n", "\n");
+        
+        match OPENCHAT_CLIENT_FACTORY
+            .build(ctx)
+            .send_message(MessageContentInitial::Text(TextContent { text }))
+            .with_channel_id(chat.channel_id())
+            .with_block_level_markdown(true)
+            .execute_async()
+            .await
+        {
+            Ok(send_message::Response::Success(_)) => (),
+            Err((code, message)) => {
+                ic_cdk::println!("error: Failed to send events: code({}): message({})", code, message);
+            }
+            other => {
+                ic_cdk::println!("error: Failed to send events {:?}", other);
+            }
         }
     }
 }

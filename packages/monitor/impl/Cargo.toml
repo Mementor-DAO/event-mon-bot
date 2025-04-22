@@ -11,7 +11,10 @@ candid = {workspace = true}
 ic-cdk = {workspace = true}
 ic-cdk-timers = {workspace = true}
 ic-stable-structures = {workspace = true}
+icrc-ledger-types = {workspace = true}
 serde = {workspace = true}
 serde_json = {workspace = true}
 rmp-serde = {workspace = true}
+getrandom = {workspace = true}
 monitor_api = {path = "../api"}
+bot_api = {path = "../../bot/api"}

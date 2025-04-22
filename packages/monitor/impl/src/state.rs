@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use candid::Principal;
 use serde::{Deserialize, Serialize};
-use crate::types::{job::Job, scheduler::Scheduler};
+use crate::types::{active_job::ActiveJob, scheduler::Scheduler};
 
 const STATE_ALREADY_INITIALIZED: &str = "State has already been initialized";
 const STATE_NOT_INITIALIZED: &str = "State has not been initialized";
@@ -10,7 +10,7 @@ const STATE_NOT_INITIALIZED: &str = "State has not been initialized";
 pub struct State {
     administrator: Principal,
     bot_canister_id: Principal,
-    scheduler: Scheduler<Job>
+    scheduler: Scheduler<ActiveJob>
 }
 
 thread_local! {
@@ -93,9 +93,15 @@ impl State {
         self.bot_canister_id = bot_canister_id;
     }
 
+    pub fn scheduler(
+        &self
+    ) -> &Scheduler<ActiveJob> {
+        &self.scheduler
+    }
+
     pub fn scheduler_mut(
         &mut self
-    ) -> &mut Scheduler<Job> {
+    ) -> &mut Scheduler<ActiveJob> {
         &mut self.scheduler
     }
 }

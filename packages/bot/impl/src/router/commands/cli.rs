@@ -6,7 +6,7 @@ use ic_cdk::api::management_canister::main::{
     CanisterInstallMode, CanisterSettings, 
     CreateCanisterArgument, InstallCodeArgument, LogVisibility
 };
-use monitor_api::lifecycle::init::InitOrUpgradeArgs;
+use monitor_api::{lifecycle::init::InitOrUpgradeArgs, updates::add_job::{AddJobArgs, AddJobResult}};
 use oc_bots_sdk::{
     api::{
         command::{
@@ -30,11 +30,14 @@ use crate::{
     storage::monitor::MonitorStorage, 
     types::{
         cli::{Cli, Commands, CreateSubcommand}, 
-        monitor::{Monitor, MonitorId, MonitorState}
+        monitor::{Monitor, MonitorId}
     }, DEPLOY_MONITOR_CYCLES
 };
 
 static DEFINITION: LazyLock<BotCommandDefinition> = LazyLock::new(EventsMonCli::definition);
+
+const MIN_INTERVAL: u32 = 15;
+const MAX_INTERVAL: u32 = 60;
 
 pub struct EventsMonCli;
 
@@ -93,7 +96,7 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                             CreateSubcommand::Canister { canister_id, method_name, output_template, interval } => {
                                 Self::create_canister_job(
                                     canister_id, method_name, output_template, interval, chat, &client
-                                )
+                                ).await
                             }
                         }
                     },
@@ -152,10 +155,15 @@ impl EventsMonCli {
             return Err(format!("Monitor already deployed. Canister id: {}", mon.canister_id))
         }
 
+        let admin = state::read(|s| s.administrator().clone());
+
         let canister_id = ic_cdk::api::management_canister::main::create_canister(
             CreateCanisterArgument {
                 settings: Some(CanisterSettings{
-                    controllers: Some(vec![ic_cdk::api::id()]),
+                    controllers: Some(vec![
+                        ic_cdk::api::id(),
+                        admin
+                    ]),
                     compute_allocation: None,
                     memory_allocation: None,
                     freezing_threshold: None,
@@ -169,10 +177,10 @@ impl EventsMonCli {
             .map_err(|e| e.1)?
             .0.canister_id;
 
-        let (administrator, wasm_module) = state::read(|s| 
+        let (administrator, wasm) = state::read(|s| 
             (
                 s.administrator().clone(),
-                s.monitor_wasm().image.clone()
+                s.monitor_wasm().clone()
             )
         );
         let bot_canister_id = ic_cdk::id();
@@ -180,7 +188,7 @@ impl EventsMonCli {
         ic_cdk::api::management_canister::main::install_code(InstallCodeArgument {
             mode: CanisterInstallMode::Install,
             canister_id,
-            wasm_module,
+            wasm_module: wasm.image,
             arg: Encode!(&InitOrUpgradeArgs { 
                 administrator, 
                 bot_canister_id,
@@ -188,11 +196,7 @@ impl EventsMonCli {
         }).await
             .map_err(|e| e.1)?;
 
-        MonitorStorage::save(id, Monitor{
-            chat,
-            state: MonitorState::Running,
-            canister_id,
-        });
+        MonitorStorage::save(id, Monitor::new(chat, canister_id, wasm.hash));
 
         Ok(EphemeralMessageBuilder::new(
             MessageContentInitial::from_text(format!("Monitor deployed! Canister id: {}", canister_id)),
@@ -200,47 +204,50 @@ impl EventsMonCli {
         ).with_block_level_markdown(true).build().into())
     }
 
-    fn create_canister_job(
+    async fn create_canister_job(
         canister_id: String, 
-        _method_name: String, 
-        _output_template: String, 
-        _interval: u32,
-        _chat: Chat,
+        method_name: String, 
+        output_template: String, 
+        interval: u32,
+        chat: Chat,
         client: &Client<CanisterRuntime, BotCommandContext>
     ) -> Result<SuccessResult, String> {
 
-        let _canister_id = Principal::from_text(canister_id).unwrap();
+        let canister_id = Principal::from_text(canister_id).unwrap();
 
-        let job_id = 0; /*states::mon::mutate(|s| {
-            let job = Mon::new_canister(
-                canister_id, 
-                method_name, 
-                output_template, 
-                interval, 
-                chat
-            );
-    
-            let scheduler = s.scheduler_mut();
-            match scheduler.add(job, chat, env::now()) {
-                Ok(res) => {
-                    if res.next_due {
-                        scheduler.start_if_required(Self::timer_cb);
-                    }
-                    else {
-                        scheduler.restart(Self::timer_cb);
-                    }
-        
-                    Ok(res.chat_job_id)
-                },
-                Err(err) => {
-                    Err(err)
-                },
-            }
-        })?;*/
+        let mut mon = if let Some(mon) = MonitorStorage::load(&chat.into()) {
+            mon
+        }
+        else {
+            return Err("No monitor deployed. Please use '/eventmon deploy' first".to_string());
+        };
+
+        if interval < MIN_INTERVAL {
+            return Err(format!("Interval to low. Min: {}", MIN_INTERVAL));
+        }
+        else if interval > MAX_INTERVAL {
+            return Err(format!("Interval to high. Max: {}", MAX_INTERVAL));
+        }
+
+        let job_id = ic_cdk::call::<(AddJobArgs, ), (AddJobResult, )>(
+            mon.canister_id, 
+            "add_job", 
+            (AddJobArgs {
+                canister_id,
+                method_name,
+                output_template,
+                offset: 0,
+                size: 8,
+                interval,
+            }, )
+        ).await.map_err(|e| e.1)?.0?;
+
+        mon.jobs.push(job_id);
+        MonitorStorage::save(chat.into(), mon);
 
         Ok(
             EphemeralMessageBuilder::new(
-                MessageContentInitial::from_text(format!("New job created with id {}", job_id)),
+                MessageContentInitial::from_text(format!("New job with id {} created!", job_id)),
                 client.context().message_id().unwrap(),
             )
             .with_block_level_markdown(true)
@@ -248,41 +255,6 @@ impl EventsMonCli {
             .into()
         )
     }
-
-    /*async fn mon_cb(
-        ctx: BotApiKeyContext,
-        mon: Mon
-    ) {
-        match OPENCHAT_CLIENT_FACTORY
-            .build(ctx)
-            .send_message(MessageContentInitial::Text(TextContent { text: "hey!".to_string() }))
-            .with_channel_id(mon.chat.channel_id())
-            .with_block_level_markdown(true)
-            .execute_async()
-            .await
-        {
-            Ok(send_message::Response::Success(_)) => (),
-            Err((code, message)) => {
-                ic_cdk::println!("error: Failed to send event: code({}): message({})", code, message);
-            }
-            other => {
-                ic_cdk::println!("error: Failed to send event {:?}", other);
-            }
-        }
-    }
-
-    fn timer_cb(
-    ) {
-        states::mon::mutate(|mon_state| {
-            state::read(|main_state| {
-                mon_state.scheduler_mut().process(
-                    main_state.api_key_registry(),
-                    Self::timer_cb,
-                    Self::mon_cb
-                );
-            })
-        })
-    }*/
 
     fn definition(
     ) -> BotCommandDefinition {

@@ -27,18 +27,13 @@ impl<T> Scheduler<T>
     pub fn add(
         &mut self,
         job: T,
-        utc_now: u64,
+        now: u64,
     ) -> Result<(JobId, bool), String> {
         if self.jobs.len() >= MAX_JOBS {
             return Err("Too many jobs".to_string());
         }
 
-        let timestamp = if job.repeat() {
-            Self::next_job_time(&job, utc_now).unwrap()
-        }
-        else {
-            utc_now + job.interval()
-        };
+        let timestamp = now + job.interval();
 
         let job_id = self.next_id;
         self.next_id += 1;
@@ -50,7 +45,7 @@ impl<T> Scheduler<T>
 
         self.ordered.insert((timestamp, job_id));
 
-        let next_due = self.peek().map(|(_, id)| id == job_id).unwrap();
+        let next_due = self.peek().unwrap().1 == job_id;
 
         Ok((job_id, next_due))
     }
@@ -66,7 +61,8 @@ impl<T> Scheduler<T>
             
         TIMER_ID.set(None);
 
-        while let Some((_job, job_id)) = self.pop_next_due_job(ic_cdk::api::time()) {
+        let now = ic_cdk::api::time() / 1_000_000;
+        while let Some((_job, job_id)) = self.pop_next_due_job(now) {
             ic_cdk::spawn(job_cb(job_id));
         }
 
@@ -80,9 +76,9 @@ impl<T> Scheduler<T>
         where F: 'static + FnOnce() -> () {
         if TIMER_ID.get().is_none() {
             if let Some(next_job_due) = self.peek().map(|(timestamp, _)| timestamp) {
-                let utc_now = ic_cdk::api::time();
+                let now = ic_cdk::api::time() / 1_000_000;
                 let timer_id = ic_cdk_timers::set_timer(
-                    Duration::from_millis(next_job_due.saturating_sub(utc_now)),
+                    Duration::from_millis(next_job_due.saturating_sub(now)),
                     timer_cb,
                 );
                 TIMER_ID.set(Some(timer_id));
@@ -113,11 +109,11 @@ impl<T> Scheduler<T>
 
     fn pop_next_due_job(
         &mut self, 
-        utc_now: u64
+        now: u64
     ) -> Option<(T, JobId)> {
         let (timestamp, job_id) = self.peek()?;
 
-        if timestamp > utc_now {
+        if timestamp > now {
             return None;
         }
 
@@ -126,7 +122,7 @@ impl<T> Scheduler<T>
         let job = self.jobs.get_mut(&job_id)?;
 
         let job = if let Some(next) =
-            Self::next_job_time(&job, utc_now) {
+            Self::next_job_time(&job, now) {
             self.ordered.insert((next, job_id));
 
             job.clone()
@@ -138,6 +134,7 @@ impl<T> Scheduler<T>
         Some((job, job_id))
     }
 
+    #[allow(unused)]
     pub fn delete(
         &mut self,
         job_id: u64
@@ -147,18 +144,12 @@ impl<T> Scheduler<T>
             .ok_or("Job not found".to_string())
     }
 
-    fn count(
-        &self
-    ) -> usize {
-        self.jobs.len()
-    }
-
     fn next_job_time(
         job: &T,
-        utc_now: u64,
+        now: u64,
     ) -> Option<u64> {
         if job.repeat() {
-            Some(utc_now + job.interval())
+            Some(now + job.interval())
         }
         else {
             None

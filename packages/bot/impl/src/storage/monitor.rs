@@ -35,7 +35,6 @@ impl MonitorStorage {
         });
     }
 
-    #[allow(unused)]
     pub fn load(
         id: &MonitorId
     ) -> Option<Monitor> {

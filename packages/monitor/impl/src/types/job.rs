@@ -2,13 +2,11 @@ use std::borrow::Cow;
 use candid::{CandidType, Decode, Encode, Principal};
 use ic_stable_structures::{storable::Bound, Storable};
 use serde::{Deserialize, Serialize};
-use super::scheduler::Schedulable;
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
 pub struct JobCanister {
     pub canister_id: Principal,
     pub method_name: String,
-    pub output_template: String,
 }
 
 #[derive(Clone, Serialize, Deserialize, CandidType)]
@@ -25,8 +23,11 @@ pub enum JobState {
 #[derive(Clone, Serialize, Deserialize, CandidType)]
 pub struct Job {
     pub ty: JobType,
+    pub output_template: String,
     pub interval: u32,
     pub state: JobState,
+    pub offset: u32,
+    pub size: u32,
 }
 
 impl Job {
@@ -34,31 +35,21 @@ impl Job {
         canister_id: Principal, 
         method_name: String, 
         output_template: String, 
+        offset: u32,
+        size: u32,
         interval: u32
     ) -> Self {
         Self {
             ty: JobType::Canister(JobCanister{
                 canister_id,
                 method_name,
-                output_template,
             }),
             interval,
+            output_template,
             state: JobState::Running,
+            offset,
+            size
         }
-    }
-}
-
-impl Schedulable<Job> for Job {
-    fn repeat(
-        &self
-    ) -> bool {
-        true
-    }
-
-    fn interval(
-        &self
-    ) -> u64 {
-        (self.interval as u64) * 1_000
     }
 }
 

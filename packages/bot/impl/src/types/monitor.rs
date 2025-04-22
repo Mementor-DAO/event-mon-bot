@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use candid::{CandidType, Decode, Encode, Principal};
 use ic_stable_structures::{storable::Bound, Storable};
+use monitor_api::updates::add_job::JobId;
 use oc_bots_sdk::types::Chat;
 use serde::{Deserialize, Serialize};
 
@@ -54,17 +55,35 @@ impl Storable for MonitorId {
     const BOUND: Bound = Bound::Unbounded;
 }
 
-#[derive(Serialize, Deserialize, CandidType)]
+#[derive(Clone, Serialize, Deserialize, CandidType)]
 pub enum MonitorState {
     Idle,
     Running
 }
 
-#[derive(Serialize, Deserialize, CandidType)]
+#[derive(Clone, Serialize, Deserialize, CandidType)]
 pub struct Monitor {
     pub chat: Chat,
     pub state: MonitorState,
     pub canister_id: Principal,
+    pub wasm_hash: Vec<u8>,
+    pub jobs: Vec<JobId>
+}
+
+impl Monitor {
+    pub fn new(
+        chat: Chat,
+        canister_id: Principal,
+        wasm_hash: Vec<u8>
+    ) -> Self {
+        Self {
+            chat,
+            state: MonitorState::Running,
+            canister_id,
+            wasm_hash,
+            jobs: vec![],
+        }
+    }
 }
 
 impl Storable for Monitor {

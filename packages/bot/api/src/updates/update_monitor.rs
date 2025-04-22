@@ -1,11 +1,9 @@
 use candid::CandidType;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Deserialize, CandidType)]
 pub struct UpdateMonitorArgs {
     pub wasm: Vec<u8>,
 }
 
-#[derive(Serialize, CandidType)]
-pub struct UpdateMonitorResponse {
-}
+pub type UpdateMonitorResponse = Result<(), String>;

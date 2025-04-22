@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 const STATE_ALREADY_INITIALIZED: &str = "State has already been initialized";
 const STATE_NOT_INITIALIZED: &str = "State has not been initialized";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MonitorWasm {
     pub image: Vec<u8>,
     pub hash: Vec<u8>,
