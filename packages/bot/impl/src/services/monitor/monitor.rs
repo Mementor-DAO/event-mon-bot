@@ -7,7 +7,7 @@ use ic_cdk::api::management_canister::main::{
 use monitor_api::{
     lifecycle::init::InitOrUpgradeArgs, queries::list_jobs::{Job, ListJobsArgs, ListJobsResult}, updates::{
         add_job::{AddJobArgs, AddJobResult, JobId}, 
-        del_job::{DelJobArgs, DelJobResult}
+        del_job::{DelJobArgs, DelJobResult}, start_job::{StartJobArgs, StartJobResult}, stop_job::{StopJobArgs, StopJobResult}
     }
 };
 use oc_bots_sdk::types::Chat;
@@ -117,6 +117,50 @@ impl MonitorService {
         Ok(job_id)
     }
 
+    pub async fn start_job(
+        mon_id: MonitorId,
+        job_id: JobId
+    ) -> Result<(), String> {
+        let mon = if let Some(mon) = MonitorStorage::load(&mon_id) {
+            mon
+        }
+        else {
+            return Err("Unknown monitor id".to_string());
+        };
+
+        ic_cdk::call::<(StartJobArgs, ), (StartJobResult, )>(
+            mon.canister_id, 
+            "start_job", 
+            (StartJobArgs {
+                job_id,
+            },)
+        ).await.map_err(|e| e.1)?.0?;
+
+        Ok(())
+    }
+
+    pub async fn stop_job(
+        mon_id: MonitorId,
+        job_id: JobId
+    ) -> Result<(), String> {
+        let mon = if let Some(mon) = MonitorStorage::load(&mon_id) {
+            mon
+        }
+        else {
+            return Err("Unknown monitor id".to_string());
+        };
+
+        ic_cdk::call::<(StopJobArgs, ), (StopJobResult, )>(
+            mon.canister_id, 
+            "stop_job", 
+            (StopJobArgs {
+                job_id,
+            },)
+        ).await.map_err(|e| e.1)?.0?;
+
+        Ok(())
+    }
+
     pub async fn del_job(
         mon_id: MonitorId,
         job_id: JobId
@@ -168,30 +212,40 @@ impl MonitorService {
     pub async fn start_all(
     ) {
         MonitorStorage::for_each(async |id, mut mon| {
-            ic_cdk::println!("info: starting monitor({})", mon.canister_id.to_text());
-            if let Err(err) = start_canister(CanisterIdRecord {
-                canister_id: mon.canister_id.clone()
-            }).await {
-                ic_cdk::println!("error: starting monitor({}): {}", mon.canister_id.to_text(), err.1);
+            match mon.state {
+                MonitorState::Idle => {
+                    ic_cdk::println!("info: starting monitor({})", mon.canister_id.to_text());
+                    if let Err(err) = start_canister(CanisterIdRecord {
+                        canister_id: mon.canister_id.clone()
+                    }).await {
+                        ic_cdk::println!("error: starting monitor({}): {}", mon.canister_id.to_text(), err.1);
+                    }
+                
+                    mon.state = MonitorState::Running;
+                    MonitorStorage::save(id, mon);
+                },
+                _ => {}
             }
-        
-            mon.state = MonitorState::Running;
-            MonitorStorage::save(id, mon);
         }).await;
     }
     
     pub async fn stop_all(
     ) {
         MonitorStorage::for_each(async |id, mut mon| {
-            ic_cdk::println!("info: stopping monitor({})", mon.canister_id.to_text());
-            if let Err(err) = stop_canister(CanisterIdRecord {
-                canister_id: mon.canister_id.clone()
-            }).await {
-                ic_cdk::println!("error: stopping monitor({}): {}", mon.canister_id.to_text(), err.1);
+            match mon.state {
+                MonitorState::Running => {
+                    ic_cdk::println!("info: stopping monitor({})", mon.canister_id.to_text());
+                    if let Err(err) = stop_canister(CanisterIdRecord {
+                        canister_id: mon.canister_id.clone()
+                    }).await {
+                        ic_cdk::println!("error: stopping monitor({}): {}", mon.canister_id.to_text(), err.1);
+                    }
+                
+                    mon.state = MonitorState::Idle;
+                    MonitorStorage::save(id, mon);
+                },
+                _ => {}
             }
-        
-            mon.state = MonitorState::Idle;
-            MonitorStorage::save(id, mon);
         }).await;
     }
 

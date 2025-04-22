@@ -29,4 +29,6 @@ service : (InitOrUpgradeArgs) -> {
   add_job : (AddJobArgs) -> (Result);
   delete_job : (DelJobArgs) -> (Result_1);
   list_jobs : (ListJobsArgs) -> (Result_2) query;
+  start_job : (DelJobArgs) -> (Result_1);
+  stop_job : (DelJobArgs) -> (Result_1);
 }

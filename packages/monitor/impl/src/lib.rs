@@ -14,7 +14,9 @@ use monitor_api::{
     lifecycle::init::*, 
     updates::{
         add_job::*, 
-        del_job::*
+        del_job::*,
+        start_job::*,
+        stop_job::*,
     },
     queries::list_jobs::*
 };

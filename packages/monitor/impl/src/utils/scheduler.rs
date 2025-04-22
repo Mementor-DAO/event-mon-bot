@@ -24,19 +24,13 @@ impl<T> Scheduler<T>
         }
     }
 
-    pub fn add(
+    pub fn add_ex(
         &mut self,
+        job_id: JobId,
         job: T,
         now: u64,
-    ) -> Result<(JobId, bool), String> {
-        if self.jobs.len() >= MAX_JOBS {
-            return Err("Too many jobs".to_string());
-        }
-
+    ) -> Result<bool, String> {
         let timestamp = now + job.interval();
-
-        let job_id = self.next_id;
-        self.next_id += 1;
 
         self.jobs.insert(
             job_id,
@@ -47,6 +41,22 @@ impl<T> Scheduler<T>
 
         let next_due = self.peek().unwrap().1 == job_id;
 
+        Ok(next_due)
+    }
+
+    pub fn add(
+        &mut self,
+        job: T,
+        now: u64,
+    ) -> Result<(JobId, bool), String> {
+        if self.jobs.len() >= MAX_JOBS {
+            return Err("Too many jobs".to_string());
+        }
+
+        let job_id = self.next_id;
+        self.next_id += 1;
+
+        let next_due = self.add_ex(job_id, job, now)?;
         Ok((job_id, next_due))
     }
 

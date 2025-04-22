@@ -2,13 +2,12 @@ use std::collections::BTreeMap;
 use bot_api::updates::notify_events::{NotifiyEventsArgs, NotifiyEventsResponse};
 use candid::Principal;
 use icrc_ledger_types::icrc::generic_value::Value;
-use monitor_api::types::job::JobType;
+use monitor_api::types::job::{JobState, JobType};
 use crate::{
     state, 
     storage::job::job::JobStorage, 
     types::{
-        job::Job, 
-        scheduler::JobId
+        active_job::ActiveJob, job::Job, scheduler::JobId
     }
 };
 
@@ -47,6 +46,70 @@ impl JobManager {
             Err(err) => {
                 Err(err)
             }
+        }
+    }
+
+    pub fn start(
+        job_id: JobId
+    ) -> Result<(), String> {
+        if let Some(mut job) = JobStorage::load(job_id) {
+            match job.state {
+                JobState::Idle => {
+                    let now = ic_cdk::api::time() / 1_000_000;
+                    state::mutate(|s| -> Result<(), String> {
+                        let next_due = s.scheduler_mut()
+                            .add_ex(
+                                job_id, 
+                                ActiveJob {
+                                    interval: job.interval,
+                                }, 
+                                now
+                            )?;
+
+                            if next_due {
+                                s.scheduler().start_if_required(Self::timer_cb);
+                            }
+                            else {
+                                s.scheduler().restart(Self::timer_cb);
+                            }
+
+                            Ok(())
+                    })?;
+
+                    job.state = JobState::Running;
+                    JobStorage::save(job_id, job);
+                }
+                _ => {}
+            }
+    
+            Ok(())
+        }
+        else {
+            Err(format!("Unknown job id: {}", job_id))
+        }
+    }
+
+    pub fn stop(
+        job_id: JobId
+    ) -> Result<(), String> {
+        if let Some(mut job) = JobStorage::load(job_id) {
+            match job.state {
+                JobState::Running => {
+                    state::mutate(|s| {
+                        let _ = s.scheduler_mut()
+                            .delete(job_id);
+                    });
+
+                    job.state = JobState::Idle;
+                    JobStorage::save(job_id, job);
+                }
+                _ => {}
+            }
+    
+            Ok(())
+        }
+        else {
+            Err(format!("Unknown job id: {}", job_id))
         }
     }
 

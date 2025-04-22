@@ -92,11 +92,13 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                         Self::list_jobs(page.max(1) - 1, chat, &client)
                             .await
                     },
-                    Commands::Start { .. } => {
-                        todo!()
+                    Commands::Start { id } => {
+                        Self::start_job(id, chat, &client)
+                            .await
                     },
-                    Commands::Stop { .. } => {
-                        todo!()
+                    Commands::Stop { id } => {
+                        Self::stop_job(id, chat, &client)
+                            .await
                     },
                     Commands::Delete { id } => {
                         Self::delete_job(id, chat, &client)
@@ -173,6 +175,40 @@ impl EventsMonCli {
         Ok(
             EphemeralMessageBuilder::new(
                 MessageContentInitial::from_text(format!("New job with id {} created!", job_id)),
+                client.context().message_id().unwrap(),
+            )
+            .build()
+            .into()
+        )
+    }
+
+    async fn start_job(
+        job_id: JobId, 
+        chat: Chat,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+        MonitorService::start_job(chat.into(), job_id).await?;
+
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::from_text(format!("Job {} started!", job_id)),
+                client.context().message_id().unwrap(),
+            )
+            .build()
+            .into()
+        )
+    }
+
+    async fn stop_job(
+        job_id: JobId, 
+        chat: Chat,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+        MonitorService::stop_job(chat.into(), job_id).await?;
+
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::from_text(format!("Job {} stopped!", job_id)),
                 client.context().message_id().unwrap(),
             )
             .build()
