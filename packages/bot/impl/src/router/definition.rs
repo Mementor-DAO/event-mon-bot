@@ -8,7 +8,7 @@ pub async fn get(
     HttpResponse::json(
         200,
         &BotDefinition {
-            description: "Events Monitor Bot posts real-time updates from any canister to your channel!"
+            description: "Event Monitor posts updates from any canister to your channel!"
                 .to_string(),
             commands: commands::definitions(),
             autonomous_config: Some(AutonomousConfig { 

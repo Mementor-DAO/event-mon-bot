@@ -20,12 +20,12 @@ use oc_bots_sdk::{
 };
 use oc_bots_sdk_canister::CanisterRuntime;
 use crate::{
-    services::monitor::MonitorService, 
-    state, 
-    types::cli::{Cli, Commands, CreateSubcommand}
+    services::{monitor::MonitorService, wallet::wallet::WalletService}, state, storage::user::UserStorage, types::{cli::{Cli, Commands, CreateSubcommand, Wallet}, user::UserTransaction}
 };
 
 static DEFINITION: LazyLock<BotCommandDefinition> = LazyLock::new(EventsMonCli::definition);
+
+const LOG_ITEMS_PER_PAGE: usize = 8;
 
 pub struct EventsMonCli;
 
@@ -103,6 +103,33 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                     Commands::Delete { id } => {
                         Self::delete_job(id, chat, &client)
                             .await
+                    },
+                    Commands::Wallet (command) => {
+                        let user_id = Principal::from_text(
+                            client.context().command.initiator.to_string()
+                        ).unwrap();
+
+                        match command {
+                            Wallet::Balance => {
+                                Self::wallet_balance(user_id, &client)
+                                    .await
+                            },
+                            Wallet::Address => {
+                                Self::wallet_address(user_id, &client)
+                                    .await
+                            },
+                            Wallet::Withdraw { to, amount } => {
+                                Self::wallet_withdraw(user_id, to, amount, &client)
+                                    .await
+                            },
+                            Wallet::Logs { page } => {
+                                Self::wallet_logs(
+                                    user_id,
+                                    page.max(1) - 1,
+                                    &client
+                                )
+                            },
+                        }
                     },
                 }
             },
@@ -266,11 +293,130 @@ impl EventsMonCli {
         )
     }
 
+    async fn wallet_balance(
+        user_id: Principal,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+
+        let icps = WalletService::balance_of(
+            user_id
+        ).await?;
+
+        let content = format!(
+            "Balance:\n  ICP: {:.8}\n  ", 
+            icps as f32 / 100000000.0
+        );
+        
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::Text(content.into()), 
+                client.context().message_id().unwrap()
+            ).with_block_level_markdown(true)
+            .build()
+            .into()
+        )
+    }
+
+    async fn wallet_address(
+        user_id: Principal,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+        let icp_acc_id = WalletService::address_of(
+            user_id
+        );
+
+        let content = format!(
+            "Address:\n  ICP: {}\n  ", 
+            icp_acc_id
+        );
+        
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::Text(content.into()), 
+                client.context().message_id().unwrap()
+            ).with_block_level_markdown(true)
+            .build()
+            .into()
+        )
+    }
+
+    async fn wallet_withdraw(
+        user_id: Principal,
+        to: Option<String>,
+        amount: f32,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+        let (block_num, account_id) = WalletService::transfer_hex(
+            user_id,
+            to,
+            (amount * 100000000.0) as u64
+        ).await?;
+
+        let content = format!(
+            "Withdrawn of **{}** ICP to account id **{}** completed! At block index: **{}**", 
+            amount, account_id, block_num
+        );
+        
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::Text(content.into()), 
+                client.context().message_id().unwrap()
+            ).with_block_level_markdown(true)
+            .build()
+            .into()
+        )
+    }
+
+    fn wallet_logs(
+        user_id: Principal,
+        page_num: usize,
+        client: &Client<CanisterRuntime, BotCommandContext>
+    ) -> Result<SuccessResult, String> {
+        let user = UserStorage::load(&user_id);
+
+        let logs = user.txs.iter()
+            .skip(page_num * LOG_ITEMS_PER_PAGE)
+            .take(LOG_ITEMS_PER_PAGE)
+            .cloned()
+            .map(|tx| match tx {
+                UserTransaction::IcpWithdraw { amount, to, block_num, timestamp } => 
+                    format!(
+                        "Withdraw: amount({} ICP) to account_id({}) with block_num({}) at timestamp({})", 
+                        amount as f32 / 100000000.0, to, block_num, timestamp
+                    ),
+            })
+            .collect::<Vec<_>>()
+            .join("\n  ");
+
+        let num_pages = (user.txs.len() + LOG_ITEMS_PER_PAGE-1) / LOG_ITEMS_PER_PAGE;
+        let page_num = (1+page_num).min(num_pages);
+
+        Ok(
+            EphemeralMessageBuilder::new(
+                MessageContentInitial::Text(
+                    format!("{}\n   \n   Page {}/{}",
+                        if logs.len() > 0 {
+                            logs
+                        } 
+                        else {
+                            "No transactions found".to_string()
+                        },
+                        page_num,
+                        num_pages
+                    ).into()
+                ), 
+                client.context().message_id().unwrap()
+            ).with_block_level_markdown(true)
+                .build()
+                .into()
+        )
+    }
+
     fn definition(
     ) -> BotCommandDefinition {
         BotCommandDefinition {
             name: "eventmon".to_string(),
-            description: Some("Events Monitor Bot's command interface. Type -h for help".to_string()),
+            description: Some("Event Monitor's command interface. Type -h for help".to_string()),
             placeholder: Some("Please wait...".to_string()),
             params: vec![
                 BotCommandParam {
