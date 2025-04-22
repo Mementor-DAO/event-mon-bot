@@ -15,7 +15,7 @@ fi
 ./scripts/build-monitor.sh
 monitor_wasm=$(od -t x1 -v -w1048576 -A n $MONITOR_RELEASE_DIR/monitor.gz | sed "s/ /\\\/g")
 
-dfx canister call bot update_monitor -v --identity default --argument-file <(echo "(
+dfx canister call bot update_monitors -v --identity default --argument-file <(echo "(
     record {
       wasm = blob \"$monitor_wasm\";
     }
