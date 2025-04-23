@@ -353,7 +353,7 @@ impl EventsMonCli {
                 j.output_template
             ))
             .collect::<Vec<_>>()
-            .join("\n  ");
+            .join("\n  \n  ---\n  ");
 
         Ok(
             EphemeralMessageBuilder::new(

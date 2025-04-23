@@ -51,7 +51,9 @@ async fn send_messages(
     messages: Vec<String>
 ) {
     if messages.len() > 0 {
-        let text = messages.join("\n  ---\n  ").replace("\\n", "\n");
+        let text = messages
+            .join("\n  ---\n  ")
+            .replace("\\n", "\n");
         
         match OPENCHAT_CLIENT_FACTORY
             .build(ctx)
