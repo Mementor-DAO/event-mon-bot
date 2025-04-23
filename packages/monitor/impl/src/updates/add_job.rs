@@ -8,10 +8,10 @@ pub fn add_job(
     let job = Job::canister(
         args.canister_id,
         args.method_name,
+        args.interval,
+        args.batch_size,
         args.output_template,
-        args.offset,
-        args.size,
-        args.interval
+        args.offset
     );
 
     match JobManager::add(job) {

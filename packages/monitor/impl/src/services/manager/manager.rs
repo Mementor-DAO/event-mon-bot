@@ -200,7 +200,7 @@ impl JobManager {
         let events = ic_cdk::call::<(u32, u32), (Result<Vec<BTreeMap<String, Value>>, String>, )>(
             canister_id.clone(), 
             method_name, 
-            (job.offset, job.size)
+            (job.offset, job.batch_size)
         ).await
             .map_err(|e| e.1)?
             .0?;

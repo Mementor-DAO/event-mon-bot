@@ -34,8 +34,8 @@ pub const MIN_MONITOR_CYCLES: u128 = 500_000_000_000;
 const FUND_MONITOR_CYCLES: u128 =    100_000_000_000;
 const MONITOR_CYCLES_CHECK_INTERVAL: u64 = 6 * 60 * 60; // every 6 hours
 
-const MIN_INTERVAL: u32 = 15;
-const MAX_INTERVAL: u32 = 60;
+const MIN_INTERVAL: u32 = 5; // 5 seconds
+const MAX_INTERVAL: u32 = 60 * 60; // 1 hour
 const ITEMS_PER_PAGE: u32 = 16;
 
 thread_local! {
@@ -147,8 +147,9 @@ impl MonitorService {
         mon_id: MonitorId,
         canister_id: Principal,
         method_name: String,
+        interval: u32,
+        batch_size: u32,
         output_template: String,
-        interval: u32
     ) -> Result<JobId, String> {
         let mut mon = if let Some(mon) = MonitorStorage::load(&mon_id) {
             mon
@@ -170,10 +171,10 @@ impl MonitorService {
             (AddJobArgs {
                 canister_id,
                 method_name,
+                interval,
+                batch_size,
                 output_template,
                 offset: 0,
-                size: 8,
-                interval,
             }, )
         ).await.map_err(|e| e.1)?.0?;
 

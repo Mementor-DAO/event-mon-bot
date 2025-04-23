@@ -9,19 +9,19 @@ pub struct Job {
     pub ty: JobType,
     pub output_template: String,
     pub interval: u32,
+    pub batch_size: u32,
     pub state: JobState,
     pub offset: u32,
-    pub size: u32,
 }
 
 impl Job {
     pub fn canister(
         canister_id: Principal, 
         method_name: String, 
+        interval: u32,
+        batch_size: u32,
         output_template: String, 
-        offset: u32,
-        size: u32,
-        interval: u32
+        offset: u32
     ) -> Self {
         Self {
             ty: JobType::Canister(JobCanister{
@@ -29,10 +29,10 @@ impl Job {
                 method_name,
             }),
             interval,
+            batch_size,
             output_template,
             state: JobState::Running,
-            offset,
-            size
+            offset
         }
     }
 }

@@ -7,10 +7,10 @@ pub type JobId = u64;
 pub struct AddJobArgs {
     pub canister_id: Principal, 
     pub method_name: String, 
+    pub interval: u32,
+    pub batch_size: u32,
     pub output_template: String, 
     pub offset: u32,
-    pub size: u32,
-    pub interval: u32
 }
 
 pub type AddJobResult = Result<JobId, String>;

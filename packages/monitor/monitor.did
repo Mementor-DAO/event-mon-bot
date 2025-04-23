@@ -1,6 +1,6 @@
 type AddJobArgs = record {
+  batch_size : nat32;
   interval : nat32;
-  size : nat32;
   canister_id : principal;
   offset : nat32;
   method_name : text;

@@ -59,10 +59,12 @@ pub enum CreateSubcommand {
         canister_id: String,
         #[arg(help = "Method name")]
         method_name: String,
-        #[arg(help = "Output template")]
-        output_template: String,
         #[arg(help = "Interval, in seconds, to poll the canister")]
         interval: u32,
+        #[arg(help = "Output template")]
+        output_template: String,
+        #[arg(short, long, default_value_t = 4, help = "Max number of items to retrieve per call")]
+        batch_size: u32,
     },
 }
 

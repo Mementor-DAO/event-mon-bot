@@ -101,9 +101,12 @@ impl CommandHandler<CanisterRuntime> for EventsMonCli {
                         match command {
                             Job::Create ( subcommand ) => {
                                 match subcommand {
-                                    CreateSubcommand::Canister { canister_id, method_name, output_template, interval } => {
+                                    CreateSubcommand::Canister { 
+                                        canister_id, method_name, output_template, 
+                                        batch_size, interval } => {
                                         Self::create_canister_job(
-                                            canister_id, method_name, output_template, interval, chat, &client
+                                            canister_id, method_name, interval, 
+                                            batch_size, output_template, chat, &client
                                         ).await
                                     }
                                 }
@@ -256,8 +259,9 @@ impl EventsMonCli {
     async fn create_canister_job(
         canister_id: String, 
         method_name: String, 
-        output_template: String, 
         interval: u32,
+        batch_size: u32,
+        output_template: String, 
         chat: Chat,
         client: &Client<CanisterRuntime, BotCommandContext>
     ) -> Result<SuccessResult, String> {
@@ -265,7 +269,7 @@ impl EventsMonCli {
         let canister_id = Principal::from_text(canister_id).unwrap();
 
         let job_id = MonitorService::add_canister_job(
-            chat.into(), canister_id, method_name, output_template, interval
+            chat.into(), canister_id, method_name, interval, batch_size, output_template
         ).await?;
 
         Ok(
