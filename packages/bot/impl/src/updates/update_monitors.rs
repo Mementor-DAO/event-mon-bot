@@ -29,7 +29,7 @@ async fn update_monitors(
         s.monitor_wasm().hash.clone()
     );
 
-    MonitorStorage::for_each(async |id, mut mon| {
+    MonitorStorage::for_each_async(async |id, mut mon| {
         if wasm_hash != mon.wasm_hash {
             ic_cdk::println!("info: updating monitor({})...", mon.canister_id.to_text());
             if let Err(err) = install_code(

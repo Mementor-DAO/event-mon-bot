@@ -2,7 +2,7 @@ use std::{collections::HashSet, sync::LazyLock};
 use async_trait::async_trait;
 use candid::Principal;
 use clap::Parser;
-use ic_ledger_types::{AccountIdentifier, DEFAULT_FEE};
+use ic_ledger_types::{AccountIdentifier, DEFAULT_FEE, DEFAULT_SUBACCOUNT};
 use monitor_api::updates::add_job::JobId;
 use oc_bots_sdk::{
     api::{
@@ -21,7 +21,7 @@ use oc_bots_sdk::{
 };
 use oc_bots_sdk_canister::CanisterRuntime;
 use crate::{
-    consts::DEPLOY_MONITOR_COST, 
+    consts::DEPLOY_MONITOR_CYCLES, 
     services::{
         monitor::MonitorService, 
         wallet::wallet::WalletService
@@ -29,9 +29,9 @@ use crate::{
     state, 
     storage::user::UserStorage, 
     types::{
-        cli::{Cli, Commands, CreateSubcommand, Wallet, Job}, 
+        cli::{Cli, Commands, CreateSubcommand, Job, Wallet}, 
         user::{UserId, UserTransaction}
-    }
+    }, utils::cmc::Cmc
 };
 
 static DEFINITION: LazyLock<BotCommandDefinition> = LazyLock::new(EventsMonCli::definition);
@@ -195,13 +195,13 @@ impl EventsMonCli {
             )
         );
 
-        let cost = DEPLOY_MONITOR_COST;
-        let balance = WalletService::balance_of(user_id).await?;
+        let cost = Cmc::cycles_to_icp(DEPLOY_MONITOR_CYCLES).await?;
+        let balance = WalletService::balance_of(user_id).await? as u128;
         if balance < cost {
             let acc_id = WalletService::address_of(user_id);
             return Err(
                 format!(
-                    "Your EventMon wallet balance of **{:.8}** ICP is too low to cover the current minting cost of **{:.8}** ICP\n  Please transfer enough ICP to this address: **{}**", 
+                    "Your EventMon wallet balance of **{:.8}** ICP is too low to cover the current monitor deployment cost of **{:.8}** ICP\n  Please transfer enough ICP to this address: **{}**", 
                     (balance as f32) / 100000000.0,
                     (cost as f32) / 100000000.0,
                     acc_id
@@ -209,13 +209,43 @@ impl EventsMonCli {
             );
         }
         
-        let canister_id = MonitorService::deploy(chat, administrator, wasm).await?;
+        if let Err(err) = WalletService::transfer(
+            user_id.into(), 
+            AccountIdentifier::new(&ic_cdk::id(), &DEFAULT_SUBACCOUNT), 
+            cost as _
+        ).await {
+            let err = format!(
+                "Failed paying the deployment cost: {}.", 
+                err
+            );
+            ic_cdk::println!("error: {}", err);
+            return Err(err);
+        };
+        
+        let canister_id = match MonitorService::deploy(
+            chat, user_id, administrator, wasm).await {
+            Ok(canister_id) => {
+                canister_id
+            },
+            Err(err) => {
+                ic_cdk::println!("error: monitor deployment failed: {}", err);
 
-        WalletService::transfer(
-            None, 
-            AccountIdentifier::new(&ic_cdk::id(), &user_id.into()), 
-            cost + DEFAULT_FEE.e8s()
-        ).await?;
+                if let Err(err) = WalletService::transfer(
+                    None, 
+                    AccountIdentifier::new(&ic_cdk::id(), &user_id.into()), 
+                    cost as u64 + DEFAULT_FEE.e8s()
+                ).await {
+                    ic_cdk::println!(
+                        "error: could not return deployment cost {} to user {}: {}", 
+                        cost, 
+                        user_id.to_text(), 
+                        err
+                    );
+                };
+
+                return Err(err);
+            },
+        };
 
         Ok(EphemeralMessageBuilder::new(
             MessageContentInitial::from_text(format!("Monitor deployed! Canister id: {}", canister_id)),

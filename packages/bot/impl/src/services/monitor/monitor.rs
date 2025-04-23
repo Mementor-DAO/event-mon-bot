@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use candid::{Encode, Principal};
 use ic_cdk::api::management_canister::main::{
     create_canister, install_code, start_canister, stop_canister, 
@@ -16,7 +17,8 @@ use monitor_api::{
 };
 use oc_bots_sdk::types::Chat;
 use crate::{
-    consts::DEPLOY_MONITOR_COST, 
+    consts::DEPLOY_CANISTER_CYCLES, 
+    services::fund::{FundCanisterConfig, FundService}, 
     state::MonitorWasm, 
     storage::monitor::MonitorStorage, 
     types::monitor::{
@@ -28,15 +30,49 @@ use crate::{
     }
 };
 
+pub const MIN_MONITOR_CYCLES: u128 = 500_000_000_000;
+const FUND_MONITOR_CYCLES: u128 =    100_000_000_000;
+const MONITOR_CYCLES_CHECK_INTERVAL: u64 = 6 * 60 * 60; // every 6 hours
+
 const MIN_INTERVAL: u32 = 15;
 const MAX_INTERVAL: u32 = 60;
 const ITEMS_PER_PAGE: u32 = 16;
 
+thread_local! {
+    static FUND_SERVICE: RefCell<FundService> = RefCell::new(FundService::new());
+}
+
 pub struct MonitorService;
 
 impl MonitorService {
+    pub fn start(
+    ) {
+        // start fund service (to auto top-up the monitors deployed)
+        let mut canisters = vec![];
+
+        MonitorStorage::for_each_mut(&mut |_mon_id, mon| {
+            // for each monitor, use its owner's subaccount to top-up the canister
+            canisters.push(
+                FundCanisterConfig {
+                    canister_id: mon.canister_id.clone(),
+                    from_subaccount: mon.owner.into(),
+                    min_cycles: MIN_MONITOR_CYCLES,
+                    fund_cycles: FUND_MONITOR_CYCLES,
+                }
+            );
+        });
+
+        FUND_SERVICE.with_borrow_mut(|service| {
+            service.start(
+                canisters,
+                MONITOR_CYCLES_CHECK_INTERVAL
+            );
+        })
+    }
+
     pub async fn deploy(
         chat: Chat,
+        user_id: Principal,
         administrator: Principal,
         wasm: MonitorWasm
     ) -> Result<Principal, String> {
@@ -48,6 +84,7 @@ impl MonitorService {
         
         let bot_canister_id = ic_cdk::id();
 
+        // 1st: create canister
         let canister_id = create_canister(
             CreateCanisterArgument {
                 settings: Some(CanisterSettings{
@@ -63,11 +100,12 @@ impl MonitorService {
                     wasm_memory_limit: None,
                 }),
             }, 
-            DEPLOY_MONITOR_COST as _
+            DEPLOY_CANISTER_CYCLES as _
         ).await
             .map_err(|e| e.1)?
             .0.canister_id;
 
+        // 2nd: install code
         ic_cdk::api::management_canister::main::install_code(InstallCodeArgument {
             mode: CanisterInstallMode::Install,
             canister_id,
@@ -79,9 +117,27 @@ impl MonitorService {
         }).await
             .map_err(|e| e.1)?;
 
+        // 3rd: deposit min cycles
+        if let Err(err) = ic_cdk::api::management_canister::main::deposit_cycles(
+            CanisterIdRecord { canister_id }, 
+            MIN_MONITOR_CYCLES
+        ).await {
+            ic_cdk::println!("error: depositing cycles to canister {}: {}", canister_id.to_text(), err.1)  ;
+        };
+
+        // 4th: auto top-up de canister from users's wallet
+        FUND_SERVICE.with_borrow_mut(|service| {
+            service.add_canister(FundCanisterConfig {
+                canister_id,
+                from_subaccount: user_id.into(),
+                min_cycles: MIN_MONITOR_CYCLES,
+                fund_cycles: FUND_MONITOR_CYCLES,
+            });
+        });
+
         MonitorStorage::save(
             mon_id, 
-            Monitor::new(chat, canister_id, wasm.hash)
+            Monitor::new(chat, user_id, canister_id, wasm.hash)
         );
 
         Ok(canister_id)
@@ -247,7 +303,7 @@ impl MonitorService {
 
     pub async fn start_all(
     ) {
-        MonitorStorage::for_each(async |id, mut mon| {
+        MonitorStorage::for_each_async(async |id, mut mon| {
             match mon.state {
                 MonitorState::Idle => {
                     ic_cdk::println!("info: starting monitor({})", mon.canister_id.to_text());
@@ -267,7 +323,7 @@ impl MonitorService {
     
     pub async fn stop_all(
     ) {
-        MonitorStorage::for_each(async |id, mut mon| {
+        MonitorStorage::for_each_async(async |id, mut mon| {
             match mon.state {
                 MonitorState::Running => {
                     ic_cdk::println!("info: stopping monitor({})", mon.canister_id.to_text());
@@ -291,7 +347,7 @@ impl MonitorService {
     ) {
         let bot_canister_id = ic_cdk::api::id();
     
-        MonitorStorage::for_each(async |id, mut mon| {
+        MonitorStorage::for_each_async(async |id, mut mon| {
             if wasm.hash != mon.wasm_hash {
                 ic_cdk::println!("info: updating monitor({})", mon.canister_id.to_text());
                 if let Err(err) = install_code(

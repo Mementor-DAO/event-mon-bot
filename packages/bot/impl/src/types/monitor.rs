@@ -90,6 +90,7 @@ impl Display for MonitorState {
 pub struct Monitor {
     pub chat: Chat,
     pub state: MonitorState,
+    pub owner: Principal,
     pub canister_id: Principal,
     pub wasm_hash: Vec<u8>,
     pub jobs: Vec<JobId>
@@ -98,12 +99,14 @@ pub struct Monitor {
 impl Monitor {
     pub fn new(
         chat: Chat,
+        owner: Principal,
         canister_id: Principal,
         wasm_hash: Vec<u8>
     ) -> Self {
         Self {
             chat,
             state: MonitorState::Running,
+            owner,
             canister_id,
             wasm_hash,
             jobs: vec![],

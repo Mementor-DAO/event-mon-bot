@@ -208,6 +208,7 @@ dependencies = [
  "async-trait",
  "bot_api",
  "candid",
+ "canfund",
  "clap 4.5.36",
  "futures",
  "hex",
@@ -296,6 +297,25 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.100",
+]
+
+[[package]]
+name = "canfund"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7491b967ee1b9167c3beab5a2b762085af3309ddcfd803e728090cdc222a8f0"
+dependencies = [
+ "async-trait",
+ "candid",
+ "futures",
+ "ic-cdk 0.17.1",
+ "ic-cdk-timers",
+ "ic-ledger-types",
+ "icrc-ledger-types",
+ "num-bigint",
+ "serde",
+ "serde_bytes",
+ "thiserror",
 ]
 
 [[package]]

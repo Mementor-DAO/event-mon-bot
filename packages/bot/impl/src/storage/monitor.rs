@@ -61,7 +61,17 @@ impl MonitorStorage {
         })
     }
 
-    pub async fn for_each<F, R>(
+    pub fn for_each_mut<F>(
+        fun: &mut F
+    ) where F: FnMut(MonitorId, Monitor) {
+        MONITORS.with_borrow(|monitors| {
+            monitors.iter()
+                .map(|(id, m)| fun(id, m))
+                .collect::<Vec<_>>()
+        });
+    }
+
+    pub async fn for_each_async<F, R>(
         fun: F
     ) where F: Fn(MonitorId, Monitor) -> R,
         R: Future<Output = ()> {

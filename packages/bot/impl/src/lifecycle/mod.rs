@@ -1,11 +1,22 @@
-use std::time::Duration;
-use crate::{services::monitor::MonitorService, state::{self, State}};
+use std::{cell::RefCell, time::Duration};
+use ic_ledger_types::DEFAULT_SUBACCOUNT;
+use crate::{
+    services::{
+        fund::fund::{FundCanisterConfig, FundService}, 
+        monitor::MonitorService
+    }, 
+    state::{self, State}
+};
 
 pub mod init;
 pub mod post_upgrade;
 pub mod pre_upgrade;
 
 const READER_WRITER_BUFFER_SIZE: usize = 10 * 1024 * 1024; // 10MB
+
+thread_local! {
+    static FUND_SERVICE: RefCell<FundService> = RefCell::new(FundService::new());
+}
 
 pub(crate) fn setup(
     state: State
@@ -14,8 +25,24 @@ pub(crate) fn setup(
 
     state::init(state);
 
+    // start fund service (to auto top-up our canisters)
+    FUND_SERVICE.with_borrow_mut(|service| {
+        service.start(
+            vec![FundCanisterConfig {
+                canister_id: ic_cdk::id(),
+                from_subaccount: DEFAULT_SUBACCOUNT,
+                min_cycles:  5_000_000_000_000,
+                fund_cycles: 1_000_000_000_000,
+            }], 
+            3 * 60 // every 3 minutes
+        );
+    });
+
+    MonitorService::start();
+
+    // update all deployed monitors if the wasm changed
     ic_cdk_timers::set_timer(
-        Duration::from_secs(1), 
+        Duration::ZERO, 
         || ic_cdk::spawn(update_monitors())
     );
 

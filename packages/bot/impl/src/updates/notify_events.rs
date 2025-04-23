@@ -15,7 +15,10 @@ pub async fn notify_events(
     args: NotifiyEventsArgs
 ) -> NotifiyEventsResponse {
     if msg_cycles_available() < NOTIFY_EVENT_COST {
-        let err = format!("Not enough cycles sent: {} < {}", msg_cycles_available(), NOTIFY_EVENT_COST);
+        let err = format!(
+            "Not enough cycles sent to cover the costs. From monitor {}: {} < {}", 
+            ic_cdk::caller().to_text(), msg_cycles_available(), NOTIFY_EVENT_COST
+        );
         ic_cdk::println!("error: {}", err);
         return Err(err);
     }

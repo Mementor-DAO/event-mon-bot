@@ -9,7 +9,7 @@ use crate::{storage::user::UserStorage, types::user::UserTransaction};
 pub struct WalletService;
 
 impl WalletService {
-    fn account_id(
+    pub fn account_id(
         user_id: Principal
     ) -> AccountIdentifier {
         AccountIdentifier::new(
