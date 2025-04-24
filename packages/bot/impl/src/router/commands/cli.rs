@@ -204,7 +204,7 @@ impl EventsMonCli {
             let acc_id = WalletService::address_of(user_id);
             return Err(
                 format!(
-                    "Your EventMon wallet balance of **{:.8}** ICP is too low to cover the current monitor deployment cost of **{:.8}** ICP\n  Please transfer enough ICP to this address: **{}**", 
+                    "Your EventMon wallet balance of **{:.8}** ICP is too low to cover the current monitor deployment cost of **{:.8}** ICP  \nPlease transfer enough ICP to this address: **{}**", 
                     (balance as f32) / 100000000.0,
                     (cost as f32) / 100000000.0,
                     acc_id
@@ -345,7 +345,7 @@ impl EventsMonCli {
 
         let text = list.iter()
             .map(|j| format!(
-                "**Job ({})**:\n  - interval: {}s\n  - state: {}\n  - type: {}\n  - template: ```{}```", 
+                "**Job ({})**:  \n- interval: {}s  \n- state: {}  \n- type: {}  \n- template: ```{}```", 
                 j.id, 
                 j.interval, 
                 j.state, 
@@ -353,7 +353,7 @@ impl EventsMonCli {
                 j.output_template
             ))
             .collect::<Vec<_>>()
-            .join("\n  \n  ---\n  ");
+            .join("  \n  \n---  \n");
 
         Ok(
             EphemeralMessageBuilder::new(
@@ -376,7 +376,7 @@ impl EventsMonCli {
         ).await?;
 
         let text = format!(
-            "- state: {}\n  - module hash: {}\n  - memory size: {}\n  - cycles available: **{:3.8}**",
+            "- state: {}  \n- module hash: {}  \n- memory size: {}  \n- cycles available: **{:3.8}**",
             status.status,
             status.module_hash,
             status.memory_size,
@@ -404,7 +404,7 @@ impl EventsMonCli {
         ).await?;
 
         let content = format!(
-            "Balance:\n  ICP: {:.8}\n  ", 
+            "Balance:  \nICP: {:.8}  \n", 
             icps as f32 / 100000000.0
         );
         
@@ -427,7 +427,7 @@ impl EventsMonCli {
         );
 
         let content = format!(
-            "Address:\n  ICP: {}\n  ", 
+            "Address:  \nICP: {}  \n", 
             icp_acc_id
         );
         
@@ -487,7 +487,7 @@ impl EventsMonCli {
                     ),
             })
             .collect::<Vec<_>>()
-            .join("\n  ");
+            .join("  \n");
 
         let num_pages = (user.txs.len() + LOG_ITEMS_PER_PAGE-1) / LOG_ITEMS_PER_PAGE;
         let page_num = (1+page_num).min(num_pages);
@@ -495,7 +495,7 @@ impl EventsMonCli {
         Ok(
             EphemeralMessageBuilder::new(
                 MessageContentInitial::Text(
-                    format!("{}\n   \n   Page {}/{}",
+                    format!("{}  \n  \nPage {}/{}",
                         if logs.len() > 0 {
                             logs
                         } 

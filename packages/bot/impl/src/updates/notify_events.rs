@@ -52,7 +52,7 @@ async fn send_messages(
 ) {
     if messages.len() > 0 {
         let text = messages
-            .join("\n  ---\n  ")
+            .join("  \n---  \n")
             .replace("\\n", "\n");
         
         match OPENCHAT_CLIENT_FACTORY
