@@ -116,14 +116,19 @@ impl JobManager {
     pub fn delete(
         job_id: JobId
     ) -> Result<(), String> {
-        state::mutate(|s| {
-            s.scheduler_mut()
-                .delete(job_id)
-        })?;
+        if JobStorage::exists(&job_id) {
+            state::mutate(|s| {
+                let _ = s.scheduler_mut()
+                    .delete(job_id);
+            });
 
-        JobStorage::remove(job_id);
+            JobStorage::remove(job_id);
 
-        Ok(())
+            Ok(())
+        }
+        else {
+            Err(format!("Unknown job id: {}", job_id))
+        }
     }
 
     pub fn list(
@@ -141,7 +146,21 @@ impl JobManager {
             })
             .collect()
     }
-    
+
+    pub async fn get_current_offset(
+        canister_id: &Principal, 
+        method_name: &String, 
+    ) -> Result<u32, String> {
+        let res = ic_cdk::call::<(u32, u32), (Result<(Vec<BTreeMap<String, Value>>, u32), String>, )>(
+            canister_id.clone(), 
+            method_name, 
+            (0, 1)
+        ).await
+            .map_err(|e| e.1)?
+            .0?;
+
+        Ok(res.1)
+    }
 
     pub fn start_if_required(
     ) {
@@ -167,22 +186,28 @@ impl JobManager {
         if let Some(mut job) = JobStorage::load(job_id) {
             match job.ty.clone() {
                 JobType::Canister(can) => {
-                    match Self::query_canister(
-                        &can.canister_id, 
-                        &can.method_name, 
-                        &mut job
-                    ).await {
-                        Ok(messages) => {
-                            if messages.len() > 0 {
-                                if let Err(err) = Self::notify_events(messages).await {
-                                    ic_cdk::println!("error: notifying events: {}", err);    
+                    loop {
+                        match Self::query_canister(
+                            &can.canister_id, 
+                            &can.method_name, 
+                            &mut job
+                        ).await {
+                            Ok((messages, more_data)) => {
+                                if messages.len() > 0 {
+                                    if let Err(err) = Self::notify_events(messages).await {
+                                        ic_cdk::println!("error: notifying events: {}", err);    
+                                    }
+                                }
+                                if !more_data {
+                                    break;
                                 }
                             }
-                        }
-                        Err(err) => {
-                            ic_cdk::println!("error: calling {}.{}: {}", can.canister_id.to_text(), can.method_name, err);
-                        }
-                    };
+                            Err(err) => {
+                                ic_cdk::println!("error: calling {}.{}: {}", can.canister_id.to_text(), can.method_name, err);
+                                break;
+                            }
+                        };
+                    }
                 },
             }
 
@@ -194,10 +219,12 @@ impl JobManager {
         canister_id: &Principal, 
         method_name: &String, 
         job: &mut Job
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<(Vec<String>, bool), String> {
         
+        let mut messages = vec![];
+
         ic_cdk::println!("info: quering canister {}.{}", canister_id, method_name);
-        let events = ic_cdk::call::<(u32, u32), (Result<Vec<BTreeMap<String, Value>>, String>, )>(
+        let res = ic_cdk::call::<(u32, u32), (Result<(Vec<BTreeMap<String, Value>>, u32), String>, )>(
             canister_id.clone(), 
             method_name, 
             (job.offset, job.batch_size)
@@ -205,9 +232,9 @@ impl JobManager {
             .map_err(|e| e.1)?
             .0?;
 
-        job.offset += events.len() as u32;
+        let events = res.0;
 
-        let mut messages = vec![];
+        job.offset += events.len() as u32;
 
         for event in events {
             let mut text = job.output_template.clone();
@@ -217,7 +244,7 @@ impl JobManager {
             messages.push(text);
         }
 
-        Ok(messages)
+        Ok((messages, job.offset < res.1))
     }
     
     async fn notify_events(

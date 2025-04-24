@@ -33,6 +33,14 @@ impl JobStorage {
         })
     }
 
+    pub fn exists(
+        id: &JobId
+    ) -> bool {
+        JOBS.with_borrow(|jobs| {
+            jobs.contains_key(id)
+        })
+    }
+
     pub fn remove(
         id: JobId
     ) {

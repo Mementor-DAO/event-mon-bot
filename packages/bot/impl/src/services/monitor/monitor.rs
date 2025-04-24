@@ -34,8 +34,8 @@ pub const MIN_MONITOR_CYCLES: u128 = 500_000_000_000;
 const FUND_MONITOR_CYCLES: u128 =    100_000_000_000;
 const MONITOR_CYCLES_CHECK_INTERVAL: u64 = 6 * 60 * 60; // every 6 hours
 
-const MIN_INTERVAL: u32 = 5; // 5 seconds
-const MAX_INTERVAL: u32 = 60 * 60; // 1 hour
+const MIN_INTERVAL: u32 = 60; // 60 seconds
+const MAX_INTERVAL: u32 = 24 * 60 * 60; // 24 hours
 const ITEMS_PER_PAGE: u32 = 16;
 
 thread_local! {
