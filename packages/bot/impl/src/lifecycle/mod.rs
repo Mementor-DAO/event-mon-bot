@@ -33,8 +33,8 @@ pub(crate) fn setup(
                 from_subaccount: DEFAULT_SUBACCOUNT,
                 min_cycles:  5_000_000_000_000,
                 fund_cycles: 1_000_000_000_000,
-            }], 
-            30 * 60 // every 30 minutes
+            }],     
+            10 * 60 // every 10 minutes
         );
     });
 
