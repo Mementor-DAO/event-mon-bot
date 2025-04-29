@@ -34,7 +34,7 @@ pub(crate) fn setup(
                 min_cycles:  5_000_000_000_000,
                 fund_cycles: 1_000_000_000_000,
             }], 
-            3 * 60 // every 3 minutes
+            30 * 60 // every 30 minutes
         );
     });
 

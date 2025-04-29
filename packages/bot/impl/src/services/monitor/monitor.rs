@@ -105,7 +105,15 @@ impl MonitorService {
             .map_err(|e| e.1)?
             .0.canister_id;
 
-        // 2nd: install code
+        // 2nd: deposit min cycles
+        if let Err(err) = ic_cdk::api::management_canister::main::deposit_cycles(
+            CanisterIdRecord { canister_id }, 
+            MIN_MONITOR_CYCLES
+        ).await {
+            ic_cdk::println!("error: depositing cycles to canister {}: {}", canister_id.to_text(), err.1);
+        };
+
+        // 3rd: install code
         ic_cdk::api::management_canister::main::install_code(InstallCodeArgument {
             mode: CanisterInstallMode::Install,
             canister_id,
@@ -116,14 +124,6 @@ impl MonitorService {
             }).unwrap()
         }).await
             .map_err(|e| e.1)?;
-
-        // 3rd: deposit min cycles
-        if let Err(err) = ic_cdk::api::management_canister::main::deposit_cycles(
-            CanisterIdRecord { canister_id }, 
-            MIN_MONITOR_CYCLES
-        ).await {
-            ic_cdk::println!("error: depositing cycles to canister {}: {}", canister_id.to_text(), err.1)  ;
-        };
 
         // 4th: auto top-up de canister from users's wallet
         FUND_SERVICE.with_borrow_mut(|service| {
