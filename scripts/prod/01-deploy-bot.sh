@@ -16,13 +16,13 @@ fi
 ./scripts/build-monitor.sh
 monitor_wasm=$(od -t x1 -v -w1048576 -A n $MONITOR_RELEASE_DIR/monitor.gz | sed "s/ /\\\/g")
 
-dfx canister create bot --ic --identity deployer --subnet $SUBNET >/dev/null
+dfx canister create bot >/dev/null
 
-ADMIN_PRINCIPAL=$(dfx identity get-principal)
+ADMIN_PRINCIPAL=$(dfx identity get-principal --identity deployer)
 
-dfx deploy bot -v --identity default --with-cycles 1000000000000 --argument-file <(echo "(
+dfx deploy bot -v --ic --identity deployer --with-cycles 1000000000000 --argument-file <(echo "(
     record {
-      oc_public_key = \"$OC_PUBLIC_KEY_DEV\";
+      oc_public_key = \"$OC_PUBLIC_KEY_PROD\";
       administrator = principal \"$ADMIN_PRINCIPAL\";
       monitor_wasm = blob \"$monitor_wasm\";
     }
